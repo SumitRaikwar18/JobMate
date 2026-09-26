@@ -1,0 +1,15 @@
+{
+  "name": "JobMate - AI Career & Resume Platform",
+  "short_name": "JobMate",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb"
+}

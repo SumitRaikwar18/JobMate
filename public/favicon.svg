@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="jmGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#1d4ed8" />
+    </linearGradient>
+    <filter id="jmShadow" x="-10%" y="-10%" width="120%" height="120%" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#1e40af" flood-opacity="0.3" />
+    </filter>
+  </defs>
+  <!-- Background Rounded Badge -->
+  <rect x="4" y="4" width="56" height="56" rx="14" fill="url(#jmGradient)" filter="url(#jmShadow)" />
+  
+  <!-- File Document Outline -->
+  <path d="M22 17H38L46 25V47C46 48.6569 44.6569 50 43 50H22C20.3431 50 19 48.6569 19 47V20C19 18.3431 20.3431 17 22 17Z" fill="white" fill-opacity="0.16" stroke="white" stroke-width="2" stroke-linejoin="round" />
+  
+  <!-- Folded Corner -->
+  <path d="M38 17V25H46" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+  
+  <!-- Verified Checkmark in Center -->
+  <path d="M26 34L31 39L40 28" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" />
+</svg>
