@@ -1,0 +1,6 @@
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { ArrowLeft } from "lucide-react";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+export const Route = createFileRoute("/templates")({ head: () => ({ meta: [{ title: "Resume Templates — JobMate" }, { name: "description", content: "Explore JobMate's ATS-friendly resume templates." }, { property: "og:title", content: "Resume Templates — JobMate" }, { property: "og:description", content: "Explore ATS-friendly resume templates." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }), component: Page });
+function Page() { return <main className="grid min-h-screen place-items-center bg-section px-4 text-center"><div><h1 className="text-3xl font-bold">JobMate Templates</h1><p className="mt-3 text-muted-foreground">Your ATS-friendly template library is coming soon.</p><Link to="/" className={cn(buttonVariants({ variant: "outline" }), "mt-6")}><ArrowLeft className="size-4" />Back home</Link></div></main>; }
