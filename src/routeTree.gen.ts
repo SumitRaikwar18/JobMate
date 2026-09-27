@@ -10,14 +10,28 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApplicationsRouteImport } from './routes/applications'
+import { Route as AssistantRouteImport } from './routes/assistant'
 import { Route as BuilderRouteImport } from './routes/builder'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as JobsRouteImport } from './routes/jobs'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as TemplatesRouteImport } from './routes/templates'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApplicationsRoute = ApplicationsRouteImport.update({
+  id: '/applications',
+  path: '/applications',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AssistantRoute = AssistantRouteImport.update({
+  id: '/assistant',
+  path: '/assistant',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BuilderRoute = BuilderRouteImport.update({
@@ -30,9 +44,19 @@ const DashboardRoute = DashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const JobsRoute = JobsRouteImport.update({
+  id: '/jobs',
+  path: '/jobs',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TemplatesRoute = TemplatesRouteImport.update({
@@ -43,39 +67,83 @@ const TemplatesRoute = TemplatesRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/applications': typeof ApplicationsRoute
+  '/assistant': typeof AssistantRoute
   '/builder': typeof BuilderRoute
   '/dashboard': typeof DashboardRoute
+  '/jobs': typeof JobsRoute
   '/login': typeof LoginRoute
+  '/settings': typeof SettingsRoute
   '/templates': typeof TemplatesRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/applications': typeof ApplicationsRoute
+  '/assistant': typeof AssistantRoute
   '/builder': typeof BuilderRoute
   '/dashboard': typeof DashboardRoute
+  '/jobs': typeof JobsRoute
   '/login': typeof LoginRoute
+  '/settings': typeof SettingsRoute
   '/templates': typeof TemplatesRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/applications': typeof ApplicationsRoute
+  '/assistant': typeof AssistantRoute
   '/builder': typeof BuilderRoute
   '/dashboard': typeof DashboardRoute
+  '/jobs': typeof JobsRoute
   '/login': typeof LoginRoute
+  '/settings': typeof SettingsRoute
   '/templates': typeof TemplatesRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/builder' | '/dashboard' | '/login' | '/templates'
+  fullPaths:
+    | '/'
+    | '/applications'
+    | '/assistant'
+    | '/builder'
+    | '/dashboard'
+    | '/jobs'
+    | '/login'
+    | '/settings'
+    | '/templates'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/builder' | '/dashboard' | '/login' | '/templates'
-  id: '__root__' | '/' | '/builder' | '/dashboard' | '/login' | '/templates'
+  to:
+    | '/'
+    | '/applications'
+    | '/assistant'
+    | '/builder'
+    | '/dashboard'
+    | '/jobs'
+    | '/login'
+    | '/settings'
+    | '/templates'
+  id:
+    | '__root__'
+    | '/'
+    | '/applications'
+    | '/assistant'
+    | '/builder'
+    | '/dashboard'
+    | '/jobs'
+    | '/login'
+    | '/settings'
+    | '/templates'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApplicationsRoute: typeof ApplicationsRoute
+  AssistantRoute: typeof AssistantRoute
   BuilderRoute: typeof BuilderRoute
   DashboardRoute: typeof DashboardRoute
+  JobsRoute: typeof JobsRoute
   LoginRoute: typeof LoginRoute
+  SettingsRoute: typeof SettingsRoute
   TemplatesRoute: typeof TemplatesRoute
 }
 
@@ -86,6 +154,20 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/applications': {
+      id: '/applications'
+      path: '/applications'
+      fullPath: '/applications'
+      preLoaderRoute: typeof ApplicationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/assistant': {
+      id: '/assistant'
+      path: '/assistant'
+      fullPath: '/assistant'
+      preLoaderRoute: typeof AssistantRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/builder': {
@@ -102,11 +184,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/jobs': {
+      id: '/jobs'
+      path: '/jobs'
+      fullPath: '/jobs'
+      preLoaderRoute: typeof JobsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/templates': {
@@ -121,9 +217,13 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApplicationsRoute: ApplicationsRoute,
+  AssistantRoute: AssistantRoute,
   BuilderRoute: BuilderRoute,
   DashboardRoute: DashboardRoute,
+  JobsRoute: JobsRoute,
   LoginRoute: LoginRoute,
+  SettingsRoute: SettingsRoute,
   TemplatesRoute: TemplatesRoute,
 }
 export const routeTree = rootRouteImport
