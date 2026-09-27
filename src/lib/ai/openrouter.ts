@@ -1,42 +1,10 @@
 /**
  * OpenRouter AI Integration for JobMate
- * Connects to OpenRouter API (Default Model: openai/gpt-4o-mini)
- * Strictly loads keys from environment variables to prevent secret leakage.
+ * Routes all requests through secure server function (callOpenRouterServerFn)
+ * Guarantees zero secret leaks in client browser inspect / DevTools / network tab.
  */
 
-export const getApiKey = (): string => {
-  // 1. Literal Vite environment replacement
-  const viteKey = import.meta.env.VITE_OPENROUTER_API_KEY;
-  if (viteKey && typeof viteKey === "string" && viteKey.trim().length > 0) {
-    return viteKey.trim();
-  }
-
-  // 2. Node / SSR runtime environment
-  if (typeof process !== "undefined" && process.env) {
-    const procKey = process.env.VITE_OPENROUTER_API_KEY || process.env.OPENROUTER_API_KEY;
-    if (procKey && typeof procKey === "string" && procKey.trim().length > 0) {
-      return procKey.trim();
-    }
-  }
-
-  return "";
-};
-
-export const getModel = (): string => {
-  const viteModel = import.meta.env.VITE_OPENROUTER_MODEL;
-  if (viteModel && typeof viteModel === "string" && viteModel.trim().length > 0) {
-    return viteModel.trim();
-  }
-
-  if (typeof process !== "undefined" && process.env) {
-    const procModel = process.env.VITE_OPENROUTER_MODEL || process.env.OPENROUTER_MODEL;
-    if (procModel && typeof procModel === "string" && procModel.trim().length > 0) {
-      return procModel.trim();
-    }
-  }
-
-  return "openai/gpt-4o-mini";
-};
+import { callOpenRouterServerFn } from "./openrouter-server";
 
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
@@ -48,54 +16,24 @@ export async function callOpenRouter(
   temperature = 0.3,
   responseFormatJson = false
 ): Promise<string> {
-  const apiKey = getApiKey();
-  const model = getModel();
-
-  if (!apiKey) {
-    console.warn("OpenRouter API key not configured in environment.");
-    return generateFallbackResponse(messages);
-  }
-
-  const payload: any = {
-    model,
-    messages,
-    temperature,
-  };
-
-  if (responseFormatJson) {
-    payload.response_format = { type: "json_object" };
-  }
-
-  console.log(`[OpenRouter AI] 🚀 Dispatching live LLM request to ${model} (${messages.length} messages)...`);
-
   try {
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-        "HTTP-Referer": "https://jobmate.ai",
-        "X-Title": "JobMate AI Resume Platform",
+    // 🛡️ Secure execution via Server Function (API Key stays strictly on server)
+    const content = await callOpenRouterServerFn({
+      data: {
+        messages,
+        temperature,
+        responseFormatJson,
       },
-      body: JSON.stringify(payload),
     });
 
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error("[OpenRouter AI Error]", response.status, errText);
-      throw new Error(`OpenRouter API responded with status ${response.status}: ${errText}`);
+    if (content && typeof content === "string" && content.trim().length > 0) {
+      return content;
     }
 
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content || "";
-    if (!content) {
-      throw new Error("OpenRouter returned empty choices array");
-    }
-    console.log(`[OpenRouter AI] ✅ Live response received (${content.length} chars)`);
-    return content;
+    console.warn("[callOpenRouter] Server returned empty response, using context fallback.");
+    return generateFallbackResponse(messages);
   } catch (error: any) {
-    console.error("[OpenRouter AI Exception]:", error);
-    // If live call fails due to network outage, return an intelligent context-aware response
+    console.error("[callOpenRouter Error]:", error);
     return generateFallbackResponse(messages);
   }
 }
