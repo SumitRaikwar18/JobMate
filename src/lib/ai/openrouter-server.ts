@@ -39,7 +39,7 @@ export const callOpenRouterServerFn = createServerFn({ method: "POST" })
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
-        "HTTP-Referer": "https://jobmate.ai",
+        "HTTP-Referer": "https://jobmate-ebon.vercel.app",
         "X-Title": "JobMate AI Resume Engine",
       },
       body: JSON.stringify(payload),
