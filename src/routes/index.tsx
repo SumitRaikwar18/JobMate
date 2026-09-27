@@ -1,5 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { JobMateLanding } from "@/components/landing/jobmate-landing";
+import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -16,5 +18,16 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
+  const router = useRouter();
+  const { user, loading } = useAuth();
+
+  useEffect(() => {
+    // If the user is authenticated (e.g. active session, email verified),
+    // automatically navigate directly to the dashboard
+    if (!loading && user) {
+      router.navigate({ to: "/dashboard" });
+    }
+  }, [user, loading, router]);
+
   return <JobMateLanding />;
 }

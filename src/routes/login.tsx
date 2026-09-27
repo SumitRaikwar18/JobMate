@@ -82,6 +82,7 @@ function AuthPage() {
           data: {
             full_name: fullName.trim(),
           },
+          emailRedirectTo: `${window.location.origin}/dashboard`,
         },
       });
 

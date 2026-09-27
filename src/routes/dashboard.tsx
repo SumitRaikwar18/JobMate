@@ -10,6 +10,7 @@ import {
   ExternalLink,
   Eye,
   FileCheck2,
+  FileCode,
   FilePlus2,
   FileText,
   GraduationCap,
@@ -37,6 +38,8 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { supabase, type UserProfile, type Resume, type Job } from "@/lib/supabase";
 import { useAuth } from "@/hooks/use-auth";
+import { analyzeJobDescriptionWithAI } from "@/lib/ai/resume-agent";
+import { generateLatexResumeSource } from "@/lib/latex/latex-generator";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
@@ -136,7 +139,7 @@ function DashboardPage() {
   const handleSignOut = async () => {
     await signOut();
     toast.success("Signed out successfully.");
-    router.navigate({ to: "/login" });
+    router.navigate({ to: "/" });
   };
 
   // Create Resume in Supabase
@@ -150,7 +153,7 @@ function DashboardPage() {
 
     setCreatingResume(true);
     try {
-      const initialScore = Math.floor(Math.random() * 15) + 80; // realistic 80-95 base score
+      const initialScore = 88;
       const { data, error } = await supabase
         .from("resumes")
         .insert({
@@ -182,11 +185,12 @@ function DashboardPage() {
 
       if (data) {
         setResumes([data as Resume, ...resumes]);
-        toast.success(`Resume "${newResumeTitle}" created!`);
+        toast.success(`Resume "${newResumeTitle}" created! Opening builder...`);
         setIsCreateResumeOpen(false);
         setNewResumeTitle("");
         setNewResumeRole("");
         setNewResumeCompany("");
+        router.navigate({ to: "/builder", search: { resumeId: data.id } as any });
       }
     } catch (err: any) {
       toast.error("Error creating resume: " + err.message);
@@ -212,7 +216,44 @@ function DashboardPage() {
     }
   };
 
-  // Analyze Job Description
+  // Export & Download LaTeX Source
+  const handleDownloadResumeLatex = (resume: Resume) => {
+    try {
+      const data = (resume.resume_data || {}) as any;
+      const latex = generateLatexResumeSource({
+        personal: {
+          name: data.personal?.name || profile?.full_name || user?.email?.split("@")[0] || "Candidate",
+          headline: resume.target_role || data.personal?.role,
+          email: data.personal?.email || user?.email || "",
+          phone: data.personal?.phone || "",
+          location: data.personal?.location || "",
+          linkedin: data.personal?.linkedin || profile?.linkedin_url,
+          github: data.personal?.github || profile?.github_url,
+          portfolio: data.personal?.portfolio,
+        },
+        summary: data.summary,
+        skills: data.skills || {},
+        experiences: data.experiences || [],
+        projects: data.projects || [],
+        education: data.education || [],
+      });
+
+      const blob = new Blob([latex], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${resume.title.toLowerCase().replace(/\s+/g, "_")}_ats.tex`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success(`Exported ATS LaTeX (.tex) for "${resume.title}"!`);
+    } catch (err: any) {
+      toast.error("Failed to export LaTeX: " + err.message);
+    }
+  };
+
+  // Analyze Job Description with AI
   const handleAnalyzeJob = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -223,35 +264,32 @@ function DashboardPage() {
 
     setAnalyzingJd(true);
     try {
-      // Extract keywords simply and calculate score
-      const extractedKeywords = [
-        "React",
-        "TypeScript",
-        "TailwindCSS",
-        "Node.js",
-        "REST APIs",
-        "CI/CD",
-        "SQL",
-        "Testing",
-      ];
-      const matchScore = Math.floor(Math.random() * 18) + 78; // 78-96% match
+      // Collect candidate skills from primary resume or profile
+      const primaryResume = resumes.find((r) => r.is_primary) || resumes[0];
+      const resumeSkills: string[] = primaryResume?.resume_data?.skills
+        ? [
+            ...(primaryResume.resume_data.skills.languages || []),
+            ...(primaryResume.resume_data.skills.frameworks || []),
+            ...(primaryResume.resume_data.skills.tools || []),
+          ]
+        : ["React", "TypeScript", "Node.js", "SQL", "Git", "REST APIs"];
+
+      const aiAnalysis = await analyzeJobDescriptionWithAI(jdText.trim(), resumeSkills);
 
       const { data, error } = await supabase
         .from("jobs")
         .insert({
           user_id: user.id,
-          title: jdTitle.trim(),
-          company: jdCompany.trim() || "Target Employer",
+          title: jdTitle.trim() || aiAnalysis.roleTitle,
+          company: jdCompany.trim() || aiAnalysis.company || "Target Employer",
           description: jdText.trim(),
-          required_skills: extractedKeywords,
-          match_score: matchScore,
+          required_skills: aiAnalysis.extractedSkills,
+          match_score: aiAnalysis.matchScore,
           match_details: {
-            matching_skills: ["React", "TypeScript", "Node.js", "REST APIs"],
-            missing_skills: ["CI/CD", "Testing"],
-            recommendations: [
-              "Include quantifiable metrics in recent project descriptions.",
-              "Highlight cloud deployment or automated testing experience.",
-            ],
+            matching_skills: aiAnalysis.matchedSkills,
+            missing_skills: aiAnalysis.missingSkills,
+            recommendations: aiAnalysis.atsRecommendations,
+            responsibilities: aiAnalysis.keyResponsibilities,
           },
           status: "saved",
         })
@@ -259,13 +297,13 @@ function DashboardPage() {
         .single();
 
       if (error) {
-        toast.error("Failed to analyze job: " + error.message);
+        toast.error("Failed to save analyzed job: " + error.message);
         return;
       }
 
       if (data) {
         setJobs([data as Job, ...jobs]);
-        toast.success(`Job analyzed! ATS Match Score: ${matchScore}%`);
+        toast.success(`AI Job Analysis Complete! Match Score: ${aiAnalysis.matchScore}%`);
         setJdTitle("");
         setJdCompany("");
         setJdText("");
@@ -423,12 +461,22 @@ function DashboardPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              <Link
+                to="/builder"
+                className={cn(
+                  buttonVariants({ variant: "default" }),
+                  "rounded-xl gap-1.5 shadow-button text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white"
+                )}
+              >
+                <Sparkles className="size-4" /> Live AI Builder
+              </Link>
               <Button
+                variant="outline"
                 size="sm"
                 onClick={() => setIsCreateResumeOpen(true)}
-                className="rounded-xl gap-1.5 shadow-button text-xs font-bold"
+                className="rounded-xl gap-1.5 text-xs font-semibold"
               >
-                <Plus className="size-4" /> Create Resume
+                <Plus className="size-4" /> Quick Resume
               </Button>
               <Button
                 variant="outline"
@@ -658,12 +706,29 @@ function DashboardPage() {
 
                       <div className="flex items-center gap-1">
                         <Link
+                          to="/builder"
+                          search={{ resumeId: resume.id } as any}
+                          className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "h-7 px-2 text-xs text-primary")}
+                          title="Edit in Live AI Builder"
+                        >
+                          <Sparkles className="size-3.5" />
+                        </Link>
+                        <Link
                           to="/templates"
                           className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "h-7 px-2 text-xs")}
                           title="Preview Template"
                         >
                           <Eye className="size-3.5" />
                         </Link>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDownloadResumeLatex(resume)}
+                          className="h-7 px-2 text-xs text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/10"
+                          title="Export ATS LaTeX (.tex)"
+                        >
+                          <FileCode className="size-3.5" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="sm"
