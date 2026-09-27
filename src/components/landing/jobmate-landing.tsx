@@ -27,6 +27,8 @@ import { useState, type ReactNode } from "react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+import { useAuth } from "@/hooks/use-auth";
+
 const telegramUrl = "https://t.me/jobmate_bot";
 
 function Logo({ compact = false }: { compact?: boolean }) {
@@ -48,6 +50,8 @@ const navItems = [
 
 function Navbar() {
   const [open, setOpen] = useState(false);
+  const { user } = useAuth();
+
   return (
     <header className="sticky top-0 z-50 border-b border-border/70 bg-background/95 backdrop-blur-md">
       <nav className="page-shell flex h-17 items-center justify-between" aria-label="Main navigation">
@@ -58,14 +62,36 @@ function Navbar() {
               {item.label}
             </Link>
           ))}
+          {user && (
+            <Link to="/dashboard" className="flex items-center text-sm font-medium text-muted-foreground hover:text-primary">
+              Dashboard
+            </Link>
+          )}
         </div>
-        <div className="hidden items-center gap-2 md:flex">
-          <Link
-            to="/login"
-            className={cn(buttonVariants({ variant: "pill", size: "sm" }), "shadow-xs font-semibold px-4")}
-          >
-            Get Started Free
-          </Link>
+        <div className="hidden items-center gap-2.5 md:flex">
+          {user ? (
+            <Link
+              to="/dashboard"
+              className={cn(buttonVariants({ variant: "pill", size: "sm" }), "shadow-xs font-semibold px-4")}
+            >
+              Go to Dashboard
+            </Link>
+          ) : (
+            <>
+              <Link
+                to="/login"
+                className="text-xs font-semibold text-muted-foreground hover:text-foreground px-2 py-1"
+              >
+                Sign In
+              </Link>
+              <Link
+                to="/login"
+                className={cn(buttonVariants({ variant: "pill", size: "sm" }), "shadow-xs font-semibold px-4")}
+              >
+                Get Started Free
+              </Link>
+            </>
+          )}
         </div>
         <Button
           variant="icon"

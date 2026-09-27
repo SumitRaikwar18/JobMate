@@ -15,11 +15,16 @@ import {
   Sparkles,
   User,
   Zap,
+  Loader2,
+  Info,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -37,32 +42,173 @@ export const Route = createFileRoute("/login")({
 
 function AuthPage() {
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
+
   const [mode, setMode] = useState<"signup" | "signin">("signup");
   const [authMethod, setAuthMethod] = useState<"password" | "otp">("password");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [otpCode, setOtpCode] = useState("");
   const [otpSent, setOtpSent] = useState(false);
+  const [confirmationNeeded, setConfirmationNeeded] = useState(false);
+
+  // If user is already logged in, redirect to dashboard
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.navigate({ to: "/dashboard" });
+    }
+  }, [user, authLoading, router]);
+
+  const handleSignUp = async () => {
+    if (!email || !password || !fullName.trim()) {
+      toast.error("Please fill in all fields (Full Name, Email, Password).");
+      return;
+    }
+    if (password.length < 6) {
+      toast.error("Password must be at least 6 characters long.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          data: {
+            full_name: fullName.trim(),
+          },
+        },
+      });
+
+      if (error) {
+        toast.error(error.message || "Failed to create account. Please try again.");
+        return;
+      }
+
+      if (data?.session) {
+        toast.success("Account created successfully! Welcome to JobMate.");
+        router.navigate({ to: "/dashboard" });
+      } else if (data?.user && !data.session) {
+        // Confirmation email sent
+        setConfirmationNeeded(true);
+        toast.success("Account created! Please check your email to confirm your account.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "An unexpected error occurred during signup.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignInWithPassword = async () => {
+    if (!email || !password) {
+      toast.error("Please enter both email and password.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+
+      if (error) {
+        toast.error(error.message || "Invalid email or password.");
+        return;
+      }
+
+      if (data?.session) {
+        toast.success("Signed in successfully!");
+        router.navigate({ to: "/dashboard" });
+      }
+    } catch (err: any) {
+      toast.error(err.message || "An unexpected error occurred during sign in.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSendOtp = async () => {
+    if (!email) {
+      toast.error("Please enter your email address first.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email: email.trim(),
+        options: {
+          shouldCreateUser: mode === "signup",
+          emailRedirectTo: `${window.location.origin}/dashboard`,
+        },
+      });
+
+      if (error) {
+        toast.error(error.message || "Failed to send magic code.");
+        return;
+      }
+
+      setOtpSent(true);
+      toast.success("Magic sign-in link and OTP sent to your email!");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to send OTP.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!email || !otpCode) {
+      toast.error("Please enter your email and the 6-digit OTP code.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.auth.verifyOtp({
+        email: email.trim(),
+        token: otpCode.trim(),
+        type: "email",
+      });
+
+      if (error) {
+        toast.error(error.message || "Invalid or expired OTP code.");
+        return;
+      }
+
+      if (data?.session) {
+        toast.success("Authenticated successfully!");
+        router.navigate({ to: "/dashboard" });
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to verify OTP.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      setSubmitted(true);
-      setTimeout(() => {
-        router.navigate({ to: "/dashboard" });
-      }, 800);
-    }, 700);
-  };
-
-  const handleSendOtp = () => {
-    if (!email) return;
-    setOtpSent(true);
+    if (authMethod === "otp") {
+      if (otpSent) {
+        handleVerifyOtp();
+      } else {
+        handleSendOtp();
+      }
+    } else {
+      if (mode === "signup") {
+        handleSignUp();
+      } else {
+        handleSignInWithPassword();
+      }
+    }
   };
 
   return (
@@ -141,7 +287,7 @@ function AuthPage() {
           </span>
           <span className="flex items-center gap-1.5">
             <Lock className="size-3.5 text-slate-400" />
-            <span>Encrypted & Secure</span>
+            <span>Supabase RLS Protected</span>
           </span>
         </div>
       </aside>
@@ -174,7 +320,7 @@ function AuthPage() {
               type="button"
               onClick={() => {
                 setMode("signup");
-                setSubmitted(false);
+                setConfirmationNeeded(false);
               }}
               className={cn(
                 "flex-1 rounded-lg py-2 text-xs font-semibold transition-all duration-200",
@@ -189,7 +335,7 @@ function AuthPage() {
               type="button"
               onClick={() => {
                 setMode("signin");
-                setSubmitted(false);
+                setConfirmationNeeded(false);
               }}
               className={cn(
                 "flex-1 rounded-lg py-2 text-xs font-semibold transition-all duration-200",
@@ -213,191 +359,227 @@ function AuthPage() {
             </p>
           </div>
 
-          {/* Direct OAuth Buttons */}
+          {/* Social / Bot Buttons (Frozen state as requested) */}
           <div className="mt-6 grid grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={() => router.navigate({ to: "/dashboard" })}
-              className="flex items-center justify-center gap-2 rounded-xl border border-border/80 bg-background px-4 py-2.5 text-xs font-semibold text-foreground shadow-xs transition-colors hover:bg-accent"
-            >
-              <svg className="size-4 shrink-0" viewBox="0 0 24 24">
-                <path
-                  fill="#4285F4"
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                />
-              </svg>
-              <span>Google</span>
-            </button>
-
-            <a
-              href="https://t.me/jobmate_bot"
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center justify-center gap-2 rounded-xl border border-border/80 bg-background px-4 py-2.5 text-xs font-semibold text-foreground shadow-xs transition-colors hover:bg-accent"
-            >
-              <span className="grid size-4 shrink-0 place-items-center rounded-full bg-[#229ED9] text-white">
-                <Send className="size-2.5" />
+            <div className="relative group">
+              <button
+                type="button"
+                disabled
+                className="w-full opacity-60 cursor-not-allowed flex items-center justify-center gap-2 rounded-xl border border-border/80 bg-background px-4 py-2.5 text-xs font-semibold text-foreground shadow-xs"
+                title="Google OAuth integration coming soon"
+              >
+                <svg className="size-4 shrink-0" viewBox="0 0 24 24">
+                  <path
+                    fill="#4285F4"
+                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                  />
+                </svg>
+                <span>Google</span>
+              </button>
+              <span className="absolute -top-2 right-2 rounded-full bg-slate-200 px-1.5 py-0.5 text-[9px] font-bold text-slate-600 shadow-xs dark:bg-slate-800 dark:text-slate-300">
+                Soon
               </span>
-              <span>Telegram</span>
-            </a>
+            </div>
+
+            <div className="relative group">
+              <button
+                type="button"
+                disabled
+                className="w-full opacity-60 cursor-not-allowed flex items-center justify-center gap-2 rounded-xl border border-border/80 bg-background px-4 py-2.5 text-xs font-semibold text-foreground shadow-xs"
+                title="Telegram Bot login coming soon"
+              >
+                <span className="grid size-4 shrink-0 place-items-center rounded-full bg-[#229ED9] text-white">
+                  <Send className="size-2.5" />
+                </span>
+                <span>Telegram Bot</span>
+              </button>
+              <span className="absolute -top-2 right-2 rounded-full bg-slate-200 px-1.5 py-0.5 text-[9px] font-bold text-slate-600 shadow-xs dark:bg-slate-800 dark:text-slate-300">
+                Soon
+              </span>
+            </div>
           </div>
 
           <div className="relative my-6 text-center text-xs text-muted-foreground">
             <span className="absolute inset-x-0 top-1/2 -translate-y-1/2 border-t border-border/70" />
-            <span className="relative bg-background px-3 text-[11px] uppercase tracking-wider">
-              Or continue with email
+            <span className="relative bg-background px-3 text-[11px] uppercase tracking-wider font-semibold text-primary">
+              Primary: Email Authentication
             </span>
           </div>
 
-          {/* Credentials Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {mode === "signup" && (
+          {confirmationNeeded ? (
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-5 text-center space-y-3">
+              <div className="mx-auto grid size-12 place-items-center rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
+                <Mail className="size-6" />
+              </div>
+              <h3 className="text-base font-bold text-foreground">Check Your Email</h3>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                We've sent a confirmation link to <span className="font-semibold text-foreground">{email}</span>. Click the link to complete your account setup and access your dashboard.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setConfirmationNeeded(false);
+                  setMode("signin");
+                }}
+                className="mt-2 text-xs"
+              >
+                Proceed to Sign In
+              </Button>
+            </div>
+          ) : (
+            /* Credentials Form */
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {mode === "signup" && (
+                <div>
+                  <label className="block text-xs font-semibold text-foreground">Full Name</label>
+                  <div className="relative mt-1.5">
+                    <span className="absolute inset-y-0 left-3 flex items-center text-muted-foreground">
+                      <User className="size-4" />
+                    </span>
+                    <input
+                      type="text"
+                      required
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      placeholder="Alex Jordan"
+                      className="w-full rounded-xl border border-border bg-background py-2.5 pl-9 pr-4 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                  </div>
+                </div>
+              )}
+
               <div>
-                <label className="block text-xs font-semibold text-foreground">Full Name</label>
+                <label className="block text-xs font-semibold text-foreground">Email Address</label>
                 <div className="relative mt-1.5">
                   <span className="absolute inset-y-0 left-3 flex items-center text-muted-foreground">
-                    <User className="size-4" />
+                    <Mail className="size-4" />
                   </span>
                   <input
-                    type="text"
+                    type="email"
                     required
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="Alex Jordan"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="alex@company.com"
                     className="w-full rounded-xl border border-border bg-background py-2.5 pl-9 pr-4 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                   />
                 </div>
               </div>
-            )}
 
-            <div>
-              <label className="block text-xs font-semibold text-foreground">Email Address</label>
-              <div className="relative mt-1.5">
-                <span className="absolute inset-y-0 left-3 flex items-center text-muted-foreground">
-                  <Mail className="size-4" />
-                </span>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="alex@company.com"
-                  className="w-full rounded-xl border border-border bg-background py-2.5 pl-9 pr-4 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                />
-              </div>
-            </div>
-
-            {authMethod === "password" ? (
-              <div>
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs font-semibold text-foreground">Password</label>
-                  {mode === "signin" && (
+              {authMethod === "password" ? (
+                <div>
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-semibold text-foreground">Password</label>
+                    {mode === "signin" && (
+                      <button
+                        type="button"
+                        onClick={() => setAuthMethod("otp")}
+                        className="text-[11px] font-semibold text-primary hover:underline"
+                      >
+                        Use OTP / Magic Code
+                      </button>
+                    )}
+                  </div>
+                  <div className="relative mt-1.5">
+                    <span className="absolute inset-y-0 left-3 flex items-center text-muted-foreground">
+                      <Lock className="size-4" />
+                    </span>
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full rounded-xl border border-border bg-background py-2.5 pl-9 pr-10 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    />
                     <button
                       type="button"
-                      onClick={() => setAuthMethod("otp")}
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute inset-y-0 right-3 flex items-center text-muted-foreground hover:text-foreground"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-semibold text-foreground">One-Time Code (OTP)</label>
+                    <button
+                      type="button"
+                      onClick={() => setAuthMethod("password")}
                       className="text-[11px] font-semibold text-primary hover:underline"
                     >
-                      Use OTP / Magic Code
+                      Use Password instead
                     </button>
-                  )}
+                  </div>
+                  <div className="mt-1.5 flex gap-2">
+                    <input
+                      type="text"
+                      maxLength={8}
+                      value={otpCode}
+                      onChange={(e) => setOtpCode(e.target.value)}
+                      placeholder="Enter 6-digit code"
+                      className="flex-1 rounded-xl border border-border bg-background py-2.5 px-3.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleSendOtp}
+                      disabled={loading}
+                      className="rounded-xl border border-border bg-section px-3 text-xs font-semibold text-primary hover:bg-soft-blue disabled:opacity-50"
+                    >
+                      {otpSent ? "Resend" : "Get Code"}
+                    </button>
+                  </div>
                 </div>
-                <div className="relative mt-1.5">
-                  <span className="absolute inset-y-0 left-3 flex items-center text-muted-foreground">
-                    <Lock className="size-4" />
-                  </span>
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full rounded-xl border border-border bg-background py-2.5 pl-9 pr-10 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-3 flex items-center text-muted-foreground hover:text-foreground"
-                    aria-label={showPassword ? "Hide password" : "Show password"}
-                  >
-                    {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div>
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs font-semibold text-foreground">One-Time Code (OTP)</label>
-                  <button
-                    type="button"
-                    onClick={() => setAuthMethod("password")}
-                    className="text-[11px] font-semibold text-primary hover:underline"
-                  >
-                    Use Password instead
-                  </button>
-                </div>
-                <div className="mt-1.5 flex gap-2">
-                  <input
-                    type="text"
-                    maxLength={6}
-                    placeholder="Enter 6-digit code"
-                    className="flex-1 rounded-xl border border-border bg-background py-2.5 px-3.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleSendOtp}
-                    className="rounded-xl border border-border bg-section px-3 text-xs font-semibold text-primary hover:bg-soft-blue"
-                  >
-                    {otpSent ? "Code Sent ✔" : "Get Code"}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {mode === "signup" && (
-              <div className="flex items-start gap-2 pt-0.5 text-xs text-muted-foreground">
-                <span className="mt-0.5 grid size-3.5 shrink-0 place-items-center rounded-full bg-soft-blue text-primary">
-                  <Check className="size-2.5 stroke-[2.5]" />
-                </span>
-                <span className="text-[11px] leading-snug">
-                  Free forever plan includes ATS tailoring, PDF export, and Telegram AI companion.
-                </span>
-              </div>
-            )}
-
-            <Button
-              type="submit"
-              disabled={loading || submitted}
-              className="mt-6 w-full rounded-xl py-3 text-xs font-bold shadow-button hover:shadow-button-hover"
-            >
-              {loading ? (
-                <span>Verifying credentials...</span>
-              ) : submitted ? (
-                <span className="flex items-center gap-1.5">
-                  <CheckCircle2 className="size-4" /> Redirecting to Dashboard...
-                </span>
-              ) : mode === "signup" ? (
-                <span className="flex items-center gap-1.5">
-                  Create Free Account <ArrowRight className="size-4" />
-                </span>
-              ) : (
-                <span className="flex items-center gap-1.5">
-                  Sign In <ArrowRight className="size-4" />
-                </span>
               )}
-            </Button>
-          </form>
+
+              {mode === "signup" && (
+                <div className="flex items-start gap-2 pt-0.5 text-xs text-muted-foreground">
+                  <span className="mt-0.5 grid size-3.5 shrink-0 place-items-center rounded-full bg-soft-blue text-primary">
+                    <Check className="size-2.5 stroke-[2.5]" />
+                  </span>
+                  <span className="text-[11px] leading-snug">
+                    Free plan includes ATS score analyzer, keyword matcher, and resume downloads.
+                  </span>
+                </div>
+              )}
+
+              <Button
+                type="submit"
+                disabled={loading}
+                className="mt-6 w-full rounded-xl py-3 text-xs font-bold shadow-button hover:shadow-button-hover"
+              >
+                {loading ? (
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="size-4 animate-spin" /> Processing...
+                  </span>
+                ) : mode === "signup" ? (
+                  <span className="flex items-center gap-1.5">
+                    Create Free Account <ArrowRight className="size-4" />
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1.5">
+                    Sign In <ArrowRight className="size-4" />
+                  </span>
+                )}
+              </Button>
+            </form>
+          )}
 
           {/* Footer Terms */}
           <p className="mt-5 text-center text-[11px] text-muted-foreground">
