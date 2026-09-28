@@ -30,7 +30,7 @@ export function JobMateEmblem({ className, size = "md" }: { className?: string; 
       )}
     >
       <img
-        src="/logo.png"
+        src="/jobmate.png"
         alt="JobMate AI Logo"
         className="w-full h-full object-cover select-none"
         onError={(e) => {

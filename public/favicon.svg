@@ -1,45 +1,65 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
   <defs>
-    <linearGradient id="jmBg" x1="0%" y1="0%" x2="100%" y2="100%">
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#18181B" />
+      <stop offset="100%" stop-color="#09090B" />
+    </linearGradient>
+    <linearGradient id="bodyGrad" x1="20%" y1="80%" x2="80%" y2="20%">
       <stop offset="0%" stop-color="#4F46E5" />
-      <stop offset="50%" stop-color="#4338CA" />
-      <stop offset="100%" stop-color="#6D28D9" />
+      <stop offset="50%" stop-color="#7C3AED" />
+      <stop offset="100%" stop-color="#38BDF8" />
     </linearGradient>
-    <linearGradient id="jmCyan" x1="16" y1="16" x2="48" y2="48" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#38BDF8" />
-      <stop offset="1" stop-color="#818CF8" />
+    <linearGradient id="wingGrad" x1="10%" y1="90%" x2="70%" y2="30%">
+      <stop offset="0%" stop-color="#4338CA" />
+      <stop offset="100%" stop-color="#6366F1" />
     </linearGradient>
-    <linearGradient id="jmWhite" x1="20" y1="20" x2="48" y2="48" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#FFFFFF" />
-      <stop offset="1" stop-color="#E0E7FF" />
-    </linearGradient>
-    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%" filterUnits="userSpaceOnUse">
-      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#312E81" flood-opacity="0.4" />
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%" filterUnits="userSpaceOnUse">
+      <feGaussianBlur stdDeviation="2" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
     </filter>
   </defs>
 
-  <!-- Premium Rounded Squircle Background -->
-  <rect x="4" y="4" width="56" height="56" rx="16" fill="url(#jmBg)" filter="url(#shadow)" />
-  <rect x="4.5" y="4.5" width="55" height="55" rx="15.5" stroke="#FFFFFF" stroke-opacity="0.2" />
+  <!-- Dark Carbon Squircle Background -->
+  <rect x="4" y="4" width="56" height="56" rx="16" fill="url(#bgGrad)" stroke="#27272A" stroke-width="1.5" />
 
-  <!-- J Arch -->
+  <!-- Glowing Origami Ascending Jet / Rocket Arrow -->
+  <!-- Left Wing -->
   <path
-    d="M17 18H26V36C26 39.866 22.866 43 19 43C17.3431 43 16 41.6569 16 40V38"
-    stroke="url(#jmCyan)"
-    stroke-width="5"
-    stroke-linecap="round"
+    d="M15 33L29 32L24 45Z"
+    fill="url(#wingGrad)"
+    stroke="#38BDF8"
+    stroke-width="1.5"
     stroke-linejoin="round"
   />
 
-  <!-- M Trajectory -->
+  <!-- Right Wing Fold -->
   <path
-    d="M26 18L36.5 30.5L47 18V43"
-    stroke="url(#jmWhite)"
-    stroke-width="5"
-    stroke-linecap="round"
+    d="M29 32L35 44L41 30Z"
+    fill="#3730A3"
+    stroke="#38BDF8"
+    stroke-width="1.5"
     stroke-linejoin="round"
   />
 
-  <!-- AI Target Indicator Sparkle -->
-  <circle cx="47" cy="18" r="3.5" fill="#38BDF8" />
+  <!-- Central Fuselage Ascending Arrow Head -->
+  <path
+    d="M15 33L48 16L41 30L29 32Z"
+    fill="url(#bodyGrad)"
+    stroke="#38BDF8"
+    stroke-width="2"
+    stroke-linejoin="round"
+    filter="url(#glow)"
+  />
+
+  <!-- Arrow Rocket Tip -->
+  <path
+    d="M48 16L41 24M48 16L40 18"
+    stroke="#FFFFFF"
+    stroke-width="2"
+    stroke-linecap="round"
+  />
+
+  <!-- Luminous AI Sparkle at Tip -->
+  <circle cx="48" cy="16" r="2.5" fill="#38BDF8" filter="url(#glow)" />
+  <circle cx="48" cy="16" r="1.2" fill="#FFFFFF" />
 </svg>
