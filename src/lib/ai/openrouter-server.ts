@@ -1,9 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
+import { checkAndConsumeAiQuota } from "./rate-limiter";
 
 export interface OpenRouterServerPayload {
   messages: Array<{ role: "system" | "user" | "assistant"; content: string }>;
   temperature?: number;
   responseFormatJson?: boolean;
+  userId?: string;
+  tier?: "free" | "pro";
 }
 
 /**
@@ -14,6 +17,12 @@ export interface OpenRouterServerPayload {
 export const callOpenRouterServerFn = createServerFn({ method: "POST" })
   .validator((data: OpenRouterServerPayload) => data)
   .handler(async ({ data }) => {
+    const quota = checkAndConsumeAiQuota(data.userId || "anonymous-client", data.tier || "free");
+    if (!quota.allowed) {
+      console.warn(`[ServerFn: OpenRouter] Rate limit hit: ${quota.reason}`);
+      throw new Error(quota.reason || "Daily AI limit reached. Please try again tomorrow.");
+    }
+
     const apiKey = (process.env.OPENROUTER_API_KEY || "").trim();
     const model = (process.env.OPENROUTER_MODEL || "openai/gpt-4o-mini").trim();
 

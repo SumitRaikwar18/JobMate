@@ -27,6 +27,9 @@ export type UserProfile = {
   phone: string | null;
   location: string | null;
   bio: string | null;
+  daily_ai_requests_count?: number;
+  last_ai_request_date?: string;
+  plan_tier?: "free" | "pro";
   created_at: string;
   updated_at: string;
 };
