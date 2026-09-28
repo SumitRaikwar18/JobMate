@@ -111,10 +111,14 @@ function DashboardPage() {
   };
 
   useEffect(() => {
+    if (!authLoading && !user) {
+      router.navigate({ to: "/login" });
+      return;
+    }
     if (user?.id) {
       fetchData(user.id);
     }
-  }, [user]);
+  }, [user, authLoading]);
 
   // Dynamic ATS Score Calculation based on user's real resumes and profile completeness
   const computeDynamicAtsScore = () => {

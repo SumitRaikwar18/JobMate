@@ -163,7 +163,7 @@ function Hero() {
         {/* Action Buttons */}
         <div className="mt-9 flex flex-col items-center justify-center gap-3.5 sm:flex-row">
           <Link
-            to="/dashboard"
+            to="/builder"
             className={cn(buttonVariants({ variant: "primary", size: "lg" }), "w-full sm:w-auto shadow-button hover:shadow-button-hover")}
           >
             Start Building Free <ArrowRight className="size-4" />
