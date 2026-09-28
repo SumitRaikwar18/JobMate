@@ -11,6 +11,8 @@ import {
   Cpu,
   FileCheck2,
   FileText,
+  Globe,
+  Link as LinkIcon,
   Loader2,
   Plus,
   RefreshCw,
@@ -30,6 +32,7 @@ import { cn } from "@/lib/utils";
 import { supabase, type Job } from "@/lib/supabase";
 import { useAuth } from "@/hooks/use-auth";
 import { analyzeJobDescriptionWithAI, type JobDecomposition } from "@/lib/ai/resume-agent";
+import { scrapeJobUrlServerFn } from "@/lib/ai/job-scraper-server";
 
 export const Route = createFileRoute("/jobs")({
   head: () => ({
@@ -50,6 +53,11 @@ function JobsPage() {
 
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loadingJobs, setLoadingJobs] = useState(true);
+
+  // Tab mode for input
+  const [inputMode, setInputMode] = useState<"url" | "text">("url");
+  const [jobUrlInput, setJobUrlInput] = useState("");
+  const [isScrapingUrl, setIsScrapingUrl] = useState(false);
 
   // Form State
   const [jobTitle, setJobTitle] = useState("");
@@ -115,8 +123,67 @@ function JobsPage() {
     });
 
     const totalSkills = Math.max(1, mustHaves.length);
-    const score = Math.round((matched.length / totalSkills) * 40 + 55); // realistic calibrated score (55-95)
+    const score = Math.round((matched.length / totalSkills) * 40 + 55);
     return { score: Math.min(98, score), matched, missing };
+  };
+
+  const handleScrapeAndAnalyzeUrl = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!jobUrlInput.trim()) {
+      toast.error("Please enter a valid job URL.");
+      return;
+    }
+
+    setIsScrapingUrl(true);
+    try {
+      const scraped = await scrapeJobUrlServerFn({ data: { jobUrl: jobUrlInput.trim() } });
+      setJobTitle(scraped.title);
+      setCompany(scraped.company);
+      setJobDescription(scraped.description);
+      toast.success(`Successfully fetched posting from ${scraped.company}!`);
+
+      // Automatically run analysis
+      setIsAnalyzing(true);
+      const decomposition = await analyzeJobDescriptionWithAI(scraped.description, scraped.title, scraped.company);
+      const { score, matched, missing } = computeMatchAndGaps(decomposition);
+
+      // Save to Supabase
+      if (user) {
+        const { data: savedJob } = await supabase
+          .from("jobs")
+          .insert({
+            user_id: user.id,
+            title: scraped.title,
+            company: scraped.company,
+            description: scraped.description,
+            url: scraped.url,
+            ats_match_score: score,
+            required_skills: decomposition.mustHaveSkills,
+            status: "saved",
+            notes: `Source: ${scraped.source.toUpperCase()}. Seniority: ${decomposition.seniorityLevel}.`,
+          })
+          .select()
+          .single();
+
+        if (savedJob) {
+          setJobs((prev) => [savedJob as Job, ...prev]);
+        }
+      }
+
+      setSelectedAnalysis({
+        job: { title: scraped.title, company: scraped.company, description: scraped.description, url: scraped.url },
+        decomposition,
+        matchScore: score,
+        matchedSkills: matched,
+        missingSkills: missing,
+      });
+      toast.success("Job posting analyzed and gap radar generated!");
+    } catch (err: any) {
+      toast.error("Scraper Error: " + (err.message || "Failed to fetch job URL"));
+    } finally {
+      setIsScrapingUrl(false);
+      setIsAnalyzing(false);
+    }
   };
 
   const handleAnalyzeJob = async (e?: React.FormEvent) => {
@@ -200,13 +267,13 @@ function JobsPage() {
             <div className="space-y-1">
               <div className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 px-3 py-1 text-xs font-semibold text-indigo-700 dark:text-indigo-400 border border-indigo-200/60 dark:border-indigo-800/60">
                 <Cpu className="size-3.5" />
-                Semantic JD Decomposer
+                Semantic JD Decomposer & 1-Click Scraper
               </div>
               <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
                 Job Matcher & Gap Analysis
               </h1>
               <p className="text-sm text-slate-600 dark:text-slate-400">
-                Extract hard requirements, missing technical keywords, and benchmark your candidate evidence against any job posting.
+                Paste a public job link or text to extract hard requirements, keywords, and benchmark your candidate evidence.
               </p>
             </div>
           </div>
@@ -218,67 +285,150 @@ function JobsPage() {
           <div className="lg:col-span-5 space-y-6">
             {/* Input Card */}
             <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 p-6 shadow-sm space-y-4">
-              <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <Target className="size-4 text-indigo-600" />
-                Paste Job Posting
-              </h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Target className="size-4 text-indigo-600" />
+                  Target Job Input
+                </h2>
 
-              <form onSubmit={handleAnalyzeJob} className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Mode Selector */}
+                <div className="flex rounded-lg bg-slate-100 dark:bg-slate-800 p-0.5 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setInputMode("url")}
+                    className={cn(
+                      "px-2.5 py-1 rounded-md font-semibold transition-all flex items-center gap-1",
+                      inputMode === "url"
+                        ? "bg-white dark:bg-slate-950 text-indigo-600 shadow-xs font-bold"
+                        : "text-slate-600 dark:text-slate-400"
+                    )}
+                  >
+                    <Globe className="size-3" /> 1-Click URL
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setInputMode("text")}
+                    className={cn(
+                      "px-2.5 py-1 rounded-md font-semibold transition-all flex items-center gap-1",
+                      inputMode === "text"
+                        ? "bg-white dark:bg-slate-950 text-indigo-600 shadow-xs font-bold"
+                        : "text-slate-600 dark:text-slate-400"
+                    )}
+                  >
+                    <FileText className="size-3" /> Manual Text
+                  </button>
+                </div>
+              </div>
+
+              {inputMode === "url" ? (
+                /* 1-Click Scraper Form */
+                <form onSubmit={handleScrapeAndAnalyzeUrl} className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                      Public Job Posting URL
+                    </label>
+                    <div className="relative">
+                      <LinkIcon className="size-4 absolute left-3 top-3 text-slate-400" />
+                      <input
+                        type="url"
+                        required
+                        value={jobUrlInput}
+                        onChange={(e) => setJobUrlInput(e.target.value)}
+                        placeholder="https://boards.greenhouse.io/... or lever.co, linkedin.com, ashbyhq.com"
+                        className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 pl-9 pr-3 py-2.5 text-xs text-slate-900 dark:text-white focus:border-indigo-500 focus:outline-none font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-slate-500">
+                    <span className="font-semibold text-slate-700 dark:text-slate-300">Supported:</span>
+                    {["Greenhouse", "Lever", "LinkedIn", "Indeed", "Ashby", "Workday"].map((portal) => (
+                      <span
+                        key={portal}
+                        className="rounded bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 border border-slate-200 dark:border-slate-700"
+                      >
+                        {portal}
+                      </span>
+                    ))}
+                  </div>
+
+                  <Button
+                    type="submit"
+                    disabled={isScrapingUrl || isAnalyzing || !jobUrlInput.trim()}
+                    className="w-full gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-button text-xs py-2.5"
+                  >
+                    {isScrapingUrl || isAnalyzing ? (
+                      <>
+                        <Loader2 className="size-4 animate-spin" />
+                        Scraping & Running Multi-Agent Gap Radar...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="size-4" />
+                        Fetch & Deconstruct Job
+                      </>
+                    )}
+                  </Button>
+                </form>
+              ) : (
+                /* Manual Text Form */
+                <form onSubmit={handleAnalyzeJob} className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Job Title</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Senior AI Engineer"
+                        value={jobTitle}
+                        onChange={(e) => setJobTitle(e.target.value)}
+                        className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 py-2 text-xs text-slate-900 dark:text-white focus:border-indigo-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Company</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Stripe, OpenAI"
+                        value={company}
+                        onChange={(e) => setCompany(e.target.value)}
+                        className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 py-2 text-xs text-slate-900 dark:text-white focus:border-indigo-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
                   <div>
-                    <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Job Title</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Senior AI Engineer"
-                      value={jobTitle}
-                      onChange={(e) => setJobTitle(e.target.value)}
-                      className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 py-2 text-xs text-slate-900 dark:text-white focus:border-indigo-500 focus:outline-none"
+                    <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                      Full Job Description <span className="text-rose-500">*</span>
+                    </label>
+                    <textarea
+                      rows={7}
+                      required
+                      placeholder="Paste the full job posting requirements, responsibilities, and qualifications here..."
+                      value={jobDescription}
+                      onChange={(e) => setJobDescription(e.target.value)}
+                      className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-3 text-xs text-slate-900 dark:text-white focus:border-indigo-500 focus:outline-none resize-none leading-relaxed"
                     />
                   </div>
-                  <div>
-                    <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Company</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Stripe, OpenAI"
-                      value={company}
-                      onChange={(e) => setCompany(e.target.value)}
-                      className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 py-2 text-xs text-slate-900 dark:text-white focus:border-indigo-500 focus:outline-none"
-                    />
-                  </div>
-                </div>
 
-                <div>
-                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                    Full Job Description <span className="text-rose-500">*</span>
-                  </label>
-                  <textarea
-                    rows={8}
-                    required
-                    placeholder="Paste the full job posting requirements, responsibilities, and qualifications here..."
-                    value={jobDescription}
-                    onChange={(e) => setJobDescription(e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-3 text-xs text-slate-900 dark:text-white focus:border-indigo-500 focus:outline-none resize-none leading-relaxed"
-                  />
-                </div>
-
-                <Button
-                  type="submit"
-                  disabled={isAnalyzing || !jobDescription.trim()}
-                  className="w-full gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-button text-xs py-2.5"
-                >
-                  {isAnalyzing ? (
-                    <>
-                      <Loader2 className="size-4 animate-spin" />
-                      Deconstructing JD with Multi-Agent DAG...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="size-4" />
-                      Deconstruct & Run Gap Radar
-                    </>
-                  )}
-                </Button>
-              </form>
+                  <Button
+                    type="submit"
+                    disabled={isAnalyzing || !jobDescription.trim()}
+                    className="w-full gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-button text-xs py-2.5"
+                  >
+                    {isAnalyzing ? (
+                      <>
+                        <Loader2 className="size-4 animate-spin" />
+                        Deconstructing JD with Multi-Agent DAG...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="size-4" />
+                        Deconstruct & Run Gap Radar
+                      </>
+                    )}
+                  </Button>
+                </form>
+              )}
             </div>
 
             {/* Saved Jobs List */}
@@ -477,7 +627,7 @@ function JobsPage() {
                     No Job Analyzed Yet
                   </h3>
                   <p className="text-xs text-slate-500 leading-relaxed">
-                    Paste a job description on the left and click <strong>Deconstruct & Run Gap Radar</strong> to see extracted skill taxonomies, ATS keywords, and candidate alignment.
+                    Paste a job posting URL or text on the left to extract skill taxonomies, ATS keywords, and candidate alignment.
                   </p>
                 </div>
               </div>

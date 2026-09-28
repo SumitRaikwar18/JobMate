@@ -4,15 +4,20 @@ import {
   Briefcase,
   Building2,
   Calendar,
+  Check,
   CheckCircle2,
+  Copy,
   DollarSign,
   ExternalLink,
   Filter,
   Loader2,
+  Mail,
+  MessageSquare,
   MoreVertical,
   Plus,
   RefreshCw,
   Search,
+  Send,
   Sparkles,
   Target,
   Trash2,
@@ -26,14 +31,18 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { supabase, type Job } from "@/lib/supabase";
 import { useAuth } from "@/hooks/use-auth";
+import {
+  generateOutreachPackage,
+  type OutreachGenerationResult,
+} from "@/lib/ai/agents/outreach-agent";
 
 export const Route = createFileRoute("/applications")({
   head: () => ({
     meta: [
       { title: "Application Pipeline Tracker — JobMate" },
-      { name: "description", content: "Track your job applications, interview stages, and offers with real-time status updates." },
+      { name: "description", content: "Track your job applications, interview stages, and offers with real-time status updates and AI cold outreach." },
       { property: "og:title", content: "Application Pipeline Tracker — JobMate" },
-      { property: "og:description", content: "Manage your active job pipeline from Saved to Offer." },
+      { property: "og:description", content: "Manage your active job pipeline from Saved to Offer with Cold Outreach AI." },
       { property: "og:type", content: "website" },
     ],
   }),
@@ -77,7 +86,7 @@ const STATUS_CONFIG: Record<ApplicationStatus, { label: string; color: string; b
 
 function ApplicationsPage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
 
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
@@ -93,6 +102,15 @@ function ApplicationsPage() {
   const [newStatus, setNewStatus] = useState<ApplicationStatus>("applied");
   const [newNotes, setNewNotes] = useState("");
   const [saving, setSaving] = useState(false);
+
+  // Cold Outreach Modal State
+  const [isOutreachModalOpen, setIsOutreachModalOpen] = useState(false);
+  const [activeOutreachJob, setActiveOutreachJob] = useState<Job | null>(null);
+  const [hiringManagerName, setHiringManagerName] = useState("");
+  const [isGeneratingOutreach, setIsGeneratingOutreach] = useState(false);
+  const [outreachResult, setOutreachResult] = useState<OutreachGenerationResult | null>(null);
+  const [outreachTab, setOutreachTab] = useState<"email" | "linkedin" | "followup">("email");
+  const [copiedState, setCopiedState] = useState<string | null>(null);
 
   // Fetch Applications from Supabase
   const fetchApplications = async () => {
@@ -195,6 +213,46 @@ function ApplicationsPage() {
     }
   };
 
+  // Open Cold Outreach Modal
+  const handleOpenOutreach = (job: Job) => {
+    setActiveOutreachJob(job);
+    setHiringManagerName("");
+    setOutreachResult(null);
+    setIsOutreachModalOpen(true);
+  };
+
+  const handleGenerateOutreach = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!activeOutreachJob) return;
+
+    setIsGeneratingOutreach(true);
+    try {
+      const result = await generateOutreachPackage({
+        jobTitle: activeOutreachJob.title,
+        company: activeOutreachJob.company || "the company",
+        jobDescription: activeOutreachJob.description || undefined,
+        candidateName: profile?.full_name || "Applicant",
+        candidateHeadline: profile?.headline || profile?.target_role || "Senior Software Engineer",
+        candidateTopProjects: ["Autonomous Agent Workflow Engine", "High-throughput Distributed Pipeline"],
+        hiringManagerName: hiringManagerName.trim() || undefined,
+      });
+
+      setOutreachResult(result);
+      toast.success("Outreach messages generated with high-conversion frameworks!");
+    } catch (err: any) {
+      toast.error("Failed to generate outreach: " + err.message);
+    } finally {
+      setIsGeneratingOutreach(false);
+    }
+  };
+
+  const handleCopyText = (text: string, type: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedState(type);
+    toast.success("Copied to clipboard!");
+    setTimeout(() => setCopiedState(null), 2000);
+  };
+
   // Filtered List
   const filteredJobs = jobs.filter((j) => {
     const matchesFilter = statusFilter === "all" || j.status === statusFilter;
@@ -220,13 +278,13 @@ function ApplicationsPage() {
             <div className="space-y-1">
               <div className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 px-3 py-1 text-xs font-semibold text-indigo-700 dark:text-indigo-400 border border-indigo-200/60 dark:border-indigo-800/60">
                 <TrendingUp className="size-3.5" />
-                Live Application Pipeline
+                Live Application Pipeline & Outreach Agent
               </div>
               <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
                 Application Tracker
               </h1>
               <p className="text-sm text-slate-600 dark:text-slate-400">
-                Manage your candidate funnel from initial save to final offer with synchronized Supabase state.
+                Track your active job pipeline and generate AI cold emails & hiring manager DMs in 1 click.
               </p>
             </div>
 
@@ -378,7 +436,19 @@ function ApplicationsPage() {
                   </div>
 
                   {/* Right Actions & Status Selector */}
-                  <div className="flex items-center gap-3 shrink-0">
+                  <div className="flex items-center gap-2.5 shrink-0">
+                    {/* Cold Outreach AI Button */}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleOpenOutreach(job)}
+                      className="gap-1.5 text-xs border-indigo-500/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/10 font-semibold"
+                      title="Generate Cold Email & LinkedIn InMail with AI"
+                    >
+                      <Mail className="size-3.5" />
+                      <span>Cold Outreach</span>
+                    </Button>
+
                     {/* Status Dropdown */}
                     <select
                       value={job.status || "applied"}
@@ -430,6 +500,217 @@ function ApplicationsPage() {
           </div>
         )}
       </div>
+
+      {/* Cold Outreach Modal */}
+      {isOutreachModalOpen && activeOutreachJob && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-2xl rounded-2xl border border-border bg-background p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
+              <div className="flex items-center gap-2.5">
+                <span className="grid size-9 place-items-center rounded-xl bg-indigo-600 text-white shadow-button">
+                  <Mail className="size-5" />
+                </span>
+                <div>
+                  <h3 className="text-base font-extrabold text-foreground">
+                    Cold Outreach & Hiring Manager DM Generator
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Generate high-converting cold emails (&lt;120 words), LinkedIn notes (&lt;300 chars), and follow-ups.
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsOutreachModalOpen(false)}
+                className="size-8 p-0 text-muted-foreground"
+              >
+                ✕
+              </Button>
+            </div>
+
+            {/* Target Job Info & Hiring Manager Name Input */}
+            <div className="rounded-xl border border-border bg-muted/40 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div>
+                <strong className="text-foreground">{activeOutreachJob.title}</strong>
+                <span className="text-muted-foreground"> at {activeOutreachJob.company || "Target Company"}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={hiringManagerName}
+                  onChange={(e) => setHiringManagerName(e.target.value)}
+                  placeholder="Hiring Manager Name (Optional)"
+                  className="rounded-lg border border-border bg-background px-2.5 py-1 text-xs text-foreground focus:outline-none w-48"
+                />
+                <Button
+                  size="sm"
+                  onClick={() => handleGenerateOutreach()}
+                  disabled={isGeneratingOutreach}
+                  className="gap-1.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold"
+                >
+                  {isGeneratingOutreach ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="size-3.5" />
+                  )}
+                  <span>{isGeneratingOutreach ? "Generating..." : "Generate AI Outreach"}</span>
+                </Button>
+              </div>
+            </div>
+
+            {/* Outreach Output Tabs */}
+            {outreachResult && (
+              <div className="space-y-4 pt-1 animate-in fade-in-50">
+                <div className="flex rounded-xl bg-muted/50 p-1 border border-border text-xs">
+                  {[
+                    { id: "email", label: "Cold Email (<120w)", icon: Mail },
+                    { id: "linkedin", label: "LinkedIn DM (<300ch)", icon: MessageSquare },
+                    { id: "followup", label: "Interview Follow-Up", icon: Send },
+                  ].map((tab) => {
+                    const Icon = tab.icon;
+                    const isActive = outreachTab === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setOutreachTab(tab.id as any)}
+                        className={cn(
+                          "flex flex-1 items-center justify-center gap-1.5 py-2 px-3 rounded-lg font-bold transition-all",
+                          isActive
+                            ? "bg-background text-foreground shadow-xs font-extrabold border border-border"
+                            : "text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        <Icon className="size-3.5 text-primary" />
+                        <span>{tab.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Tab 1: Cold Email */}
+                {outreachTab === "email" && (
+                  <div className="space-y-3 rounded-xl border border-border bg-card p-4 text-xs">
+                    <div className="flex items-center justify-between pb-2 border-b border-border">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-foreground">Subject:</span>
+                        <span className="font-semibold text-primary">{outreachResult.coldEmail.subject}</span>
+                      </div>
+                      <span className="text-[10px] font-mono text-muted-foreground">
+                        {outreachResult.coldEmail.wordCount} words
+                      </span>
+                    </div>
+
+                    <textarea
+                      rows={6}
+                      value={outreachResult.coldEmail.body}
+                      onChange={(e) =>
+                        setOutreachResult({
+                          ...outreachResult,
+                          coldEmail: { ...outreachResult.coldEmail, body: e.target.value },
+                        })
+                      }
+                      className="w-full rounded-lg border border-border bg-background p-3 text-xs leading-relaxed text-foreground focus:outline-none resize-none font-sans"
+                    />
+
+                    <div className="flex justify-end">
+                      <Button
+                        size="sm"
+                        onClick={() =>
+                          handleCopyText(
+                            `Subject: ${outreachResult.coldEmail.subject}\n\n${outreachResult.coldEmail.body}`,
+                            "email"
+                          )
+                        }
+                        className="gap-1.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
+                      >
+                        {copiedState === "email" ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+                        <span>{copiedState === "email" ? "Copied" : "Copy Subject & Body"}</span>
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Tab 2: LinkedIn Note */}
+                {outreachTab === "linkedin" && (
+                  <div className="space-y-3 rounded-xl border border-border bg-card p-4 text-xs">
+                    <div className="flex items-center justify-between pb-2 border-b border-border">
+                      <span className="font-bold text-foreground">LinkedIn Connection Invitation Note</span>
+                      <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 font-bold">
+                        {outreachResult.linkedinNote.charCount} / 300 chars
+                      </span>
+                    </div>
+
+                    <textarea
+                      rows={4}
+                      value={outreachResult.linkedinNote.message}
+                      onChange={(e) =>
+                        setOutreachResult({
+                          ...outreachResult,
+                          linkedinNote: { ...outreachResult.linkedinNote, message: e.target.value },
+                        })
+                      }
+                      className="w-full rounded-lg border border-border bg-background p-3 text-xs leading-relaxed text-foreground focus:outline-none resize-none font-sans"
+                    />
+
+                    <div className="flex justify-end">
+                      <Button
+                        size="sm"
+                        onClick={() => handleCopyText(outreachResult.linkedinNote.message, "linkedin")}
+                        className="gap-1.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
+                      >
+                        {copiedState === "linkedin" ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+                        <span>{copiedState === "linkedin" ? "Copied" : "Copy LinkedIn Note"}</span>
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Tab 3: Follow-Up */}
+                {outreachTab === "followup" && (
+                  <div className="space-y-3 rounded-xl border border-border bg-card p-4 text-xs">
+                    <div className="flex items-center justify-between pb-2 border-b border-border">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-foreground">Subject:</span>
+                        <span className="font-semibold text-primary">{outreachResult.interviewFollowUp.subject}</span>
+                      </div>
+                    </div>
+
+                    <textarea
+                      rows={6}
+                      value={outreachResult.interviewFollowUp.body}
+                      onChange={(e) =>
+                        setOutreachResult({
+                          ...outreachResult,
+                          interviewFollowUp: { ...outreachResult.interviewFollowUp, body: e.target.value },
+                        })
+                      }
+                      className="w-full rounded-lg border border-border bg-background p-3 text-xs leading-relaxed text-foreground focus:outline-none resize-none font-sans"
+                    />
+
+                    <div className="flex justify-end">
+                      <Button
+                        size="sm"
+                        onClick={() =>
+                          handleCopyText(
+                            `Subject: ${outreachResult.interviewFollowUp.subject}\n\n${outreachResult.interviewFollowUp.body}`,
+                            "followup"
+                          )
+                        }
+                        className="gap-1.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
+                      >
+                        {copiedState === "followup" ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+                        <span>{copiedState === "followup" ? "Copied" : "Copy Follow-Up"}</span>
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Add Application Modal */}
       {isAddModalOpen && (

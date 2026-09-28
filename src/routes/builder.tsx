@@ -14,6 +14,7 @@ import {
   FileCheck2,
   FileCode,
   FolderGit2,
+  GitBranch,
   GitCompare,
   GraduationCap,
   Layers,
@@ -28,6 +29,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   Sparkles,
+  Star,
   Target,
   Trash2,
   User,
@@ -58,6 +60,16 @@ import type {
   MultiAgentPipelineResult,
 } from "@/lib/ai/types";
 import { generateLatexResumeSource } from "@/lib/latex/latex-generator";
+import { ResumePaperCanvas } from "@/components/builder/resume-paper-canvas";
+import {
+  analyzeGitHubRepository,
+  type GitHubProjectAnalysis,
+} from "@/lib/ai/agents/github-agent";
+import {
+  branchCandidatePersonas,
+  type BranchedPersonaResume,
+  type PersonaType,
+} from "@/lib/ai/persona-brancher";
 
 export const Route = createFileRoute("/builder")({
   head: () => ({
@@ -215,7 +227,7 @@ function ResumeBuilderPage() {
 
   const [activeResumeId, setActiveResumeId] = useState<string | null>(null);
   const [loadingResume, setLoadingResume] = useState(false);
-  const [template, setTemplate] = useState<"modern" | "classic" | "minimal" | "executive">("modern");
+  const [template, setTemplate] = useState<"modern" | "classic" | "minimal" | "technical">("modern");
   const [activeFormTab, setActiveFormTab] = useState<"personal" | "summary" | "experience" | "projects" | "education" | "skills">("personal");
   const [atsAudit, setAtsAudit] = useState<AtsAuditResult | null>(null);
   const [isAuditing, setIsAuditing] = useState(false);
@@ -235,8 +247,20 @@ function ResumeBuilderPage() {
   const [isLatexModalOpen, setIsLatexModalOpen] = useState(false);
   const [latexSource, setLatexSource] = useState("");
 
+  // GitHub Project Parser State
+  const [isGithubModalOpen, setIsGithubModalOpen] = useState(false);
+  const [githubRepoUrl, setGithubRepoUrl] = useState("");
+  const [isAnalyzingGithub, setIsAnalyzingGithub] = useState(false);
+  const [githubAnalysis, setGithubAnalysis] = useState<GitHubProjectAnalysis | null>(null);
+
+  // Multi-Persona Branching State
+  const [isPersonaModalOpen, setIsPersonaModalOpen] = useState(false);
+  const [isBranchingPersonas, setIsBranchingPersonas] = useState(false);
+  const [branchedPersonas, setBranchedPersonas] = useState<Record<PersonaType, BranchedPersonaResume> | null>(null);
+  const [selectedPersonaTab, setSelectedPersonaTab] = useState<PersonaType>("fullstack");
+
   const handleOpenLatexModal = () => {
-    const generated = generateLatexResumeSource(resumeData);
+    const generated = generateLatexResumeSource(resumeData as any, template === "classic" ? "classic" : "modern");
     setLatexSource(generated);
     setIsLatexModalOpen(true);
   };
@@ -281,7 +305,15 @@ function ResumeBuilderPage() {
             setActiveResumeId(data.id);
             setResumeData(data.resume_data as ResumeDataState);
             if (data.template_id) {
-              setTemplate(data.template_id.includes("classic") ? "classic" : data.template_id.includes("minimal") ? "minimal" : data.template_id.includes("executive") ? "executive" : "modern");
+              setTemplate(
+                data.template_id.includes("classic")
+                  ? "classic"
+                  : data.template_id.includes("minimal")
+                  ? "minimal"
+                  : data.template_id.includes("technical")
+                  ? "technical"
+                  : "modern"
+              );
             }
             if (data.ats_feedback) {
               setAtsAudit(data.ats_feedback as AtsAuditResult);
@@ -377,7 +409,7 @@ function ResumeBuilderPage() {
     if (!pipelineResult) return;
     setResumeData(pipelineResult.generatedContent);
     if (pipelineResult.resumePlan.recommendedTemplate) {
-      setTemplate(pipelineResult.resumePlan.recommendedTemplate);
+      setTemplate(pipelineResult.resumePlan.recommendedTemplate as any);
     }
     setAtsAudit({
       overallScore: pipelineResult.atsAudit.overallScore,
@@ -390,6 +422,106 @@ function ResumeBuilderPage() {
     });
     setIsAgentModalOpen(false);
     toast.success("Tailored resume and ATS verification applied to canvas!");
+  };
+
+  // GitHub Analysis Handler
+  const handleAnalyzeGithubRepo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!githubRepoUrl.trim()) {
+      toast.error("Please enter a GitHub URL or slug (e.g. facebook/react or https://github.com/user/repo)");
+      return;
+    }
+    setIsAnalyzingGithub(true);
+    setGithubAnalysis(null);
+    try {
+      const result = await analyzeGitHubRepository(githubRepoUrl.trim());
+      setGithubAnalysis(result);
+      toast.success("GitHub repository analyzed with 3 Google XYZ bullet points!");
+    } catch (err: any) {
+      toast.error("GitHub Analysis failed: " + err.message);
+    } finally {
+      setIsAnalyzingGithub(false);
+    }
+  };
+
+  const handleAddGithubProjectToResume = () => {
+    if (!githubAnalysis) return;
+    const newProject = {
+      id: Date.now().toString(),
+      name: githubAnalysis.projectTitle,
+      technologies: githubAnalysis.primaryTechnologies.join(", "),
+      link: githubAnalysis.repoUrl,
+      bullets: githubAnalysis.xyzBullets,
+    };
+    setResumeData((prev) => ({
+      ...prev,
+      projects: [newProject, ...prev.projects],
+    }));
+    setIsGithubModalOpen(false);
+    setGithubAnalysis(null);
+    setGithubRepoUrl("");
+    toast.success(`Added "${newProject.name}" with 3 Google XYZ bullets to your resume!`);
+  };
+
+  // Multi-Persona Branching Handler
+  const handleRunPersonaBranching = async () => {
+    setIsBranchingPersonas(true);
+    try {
+      const evidenceBank: CandidateEvidenceBank = {
+        candidateId: user?.id || "local-user",
+        fullName: resumeData.personal.name,
+        targetRole: resumeData.personal.targetRole,
+        evidenceItems: [
+          ...resumeData.experiences.map((exp) => ({
+            id: exp.id,
+            category: "experience" as const,
+            title: exp.role,
+            organization: exp.company,
+            startDate: exp.startDate,
+            endDate: exp.endDate,
+            verifiedClaims: exp.bullets,
+            metrics: exp.bullets.filter((b) => b.includes("%") || /\d+/.test(b)),
+            technologiesUsed: resumeData.skills.languages.concat(resumeData.skills.frameworks),
+          })),
+          ...resumeData.projects.map((proj) => ({
+            id: proj.id,
+            category: "project" as const,
+            title: proj.name,
+            verifiedClaims: proj.bullets,
+            metrics: [],
+            technologiesUsed: proj.technologies.split(",").map((s) => s.trim()),
+          })),
+        ],
+      };
+
+      const personas = await branchCandidatePersonas(evidenceBank, resumeData.personal.name);
+      setBranchedPersonas(personas);
+      setIsPersonaModalOpen(true);
+      toast.success("Synthesized 3 specialized career personas from your evidence bank!");
+    } catch (err: any) {
+      toast.error("Persona branching failed: " + err.message);
+    } finally {
+      setIsBranchingPersonas(false);
+    }
+  };
+
+  const handleApplyPersona = (persona: BranchedPersonaResume) => {
+    setResumeData((prev) => ({
+      ...prev,
+      personal: {
+        ...prev.personal,
+        targetRole: persona.targetRole,
+      },
+      summary: persona.tailoredSummary,
+      skills: {
+        ...prev.skills,
+        languages: persona.skillsTaxonomy.languages.split(",").map((s) => s.trim()).filter(Boolean),
+        frameworks: persona.skillsTaxonomy.frameworks.split(",").map((s) => s.trim()).filter(Boolean),
+        tools: (persona.skillsTaxonomy.cloud + ", " + persona.skillsTaxonomy.databases).split(",").map((s) => s.trim()).filter(Boolean),
+      },
+    }));
+    setIsPersonaModalOpen(false);
+    toast.success(`Applied "${persona.displayName}" to your active resume!`);
   };
 
   // AI Summary Generation
@@ -517,7 +649,6 @@ function ResumeBuilderPage() {
     setIsSaving(true);
     try {
       if (activeResumeId) {
-        // Update existing resume
         const { error } = await supabase
           .from("resumes")
           .update({
@@ -539,7 +670,6 @@ function ResumeBuilderPage() {
 
         toast.success("Resume changes updated in Supabase database!");
       } else {
-        // Insert new resume
         const { data, error } = await supabase
           .from("resumes")
           .insert({
@@ -573,10 +703,6 @@ function ResumeBuilderPage() {
     }
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
-
   return (
     <div className="flex flex-col min-h-screen bg-slate-100 dark:bg-slate-950">
       {/* Top Builder Navbar */}
@@ -604,6 +730,23 @@ function ResumeBuilderPage() {
 
         {/* Action Controls */}
         <div className="flex items-center gap-2">
+          {/* Persona Branching Trigger */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRunPersonaBranching}
+            disabled={isBranchingPersonas}
+            className="h-8 gap-1.5 rounded-lg text-xs font-semibold border-border hover:bg-accent"
+            title="Branch evidence into 3 role personas (Full-Stack, Backend, AI/ML)"
+          >
+            {isBranchingPersonas ? (
+              <Loader2 className="size-3.5 animate-spin text-primary" />
+            ) : (
+              <GitBranch className="size-3.5 text-primary" />
+            )}
+            <span className="hidden sm:inline">{isBranchingPersonas ? "Branching..." : "Branch Personas"}</span>
+          </Button>
+
           {/* Multi-Agent Orchestrator Trigger */}
           <Button
             size="sm"
@@ -643,16 +786,6 @@ function ResumeBuilderPage() {
           </Button>
 
           <Button
-            variant="outline"
-            size="sm"
-            onClick={handlePrint}
-            className="h-8 gap-1.5 rounded-lg text-xs font-semibold"
-          >
-            <Printer className="size-3.5" />
-            <span className="hidden sm:inline">Print / PDF</span>
-          </Button>
-
-          <Button
             size="sm"
             onClick={handleSaveToSupabase}
             disabled={isSaving}
@@ -663,6 +796,254 @@ function ResumeBuilderPage() {
           </Button>
         </div>
       </header>
+
+      {/* GitHub Repo Intelligence Modal */}
+      {isGithubModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm print:hidden">
+          <div className="w-full max-w-2xl rounded-2xl border border-border bg-background p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
+              <div className="flex items-center gap-2.5">
+                <span className="grid size-9 place-items-center rounded-xl bg-slate-900 text-white dark:bg-slate-800 shadow-button">
+                  <FolderGit2 className="size-5 text-indigo-400" />
+                </span>
+                <div>
+                  <h3 className="text-base font-extrabold text-foreground">
+                    GitHub Code Intelligence & Project Parser
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Analyzes dependencies, AST manifests & synthesis of Google XYZ quantified bullets.
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setIsGithubModalOpen(false);
+                  setGithubAnalysis(null);
+                }}
+                className="size-8 p-0 text-muted-foreground"
+              >
+                ✕
+              </Button>
+            </div>
+
+            <form onSubmit={handleAnalyzeGithubRepo} className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-foreground mb-1">
+                  GitHub Repository URL or Slug
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={githubRepoUrl}
+                    onChange={(e) => setGithubRepoUrl(e.target.value)}
+                    placeholder="e.g. https://github.com/facebook/react or username/project"
+                    className="flex-1 rounded-xl border border-border bg-card px-3 py-2 text-xs text-foreground focus:border-primary focus:outline-none font-mono"
+                  />
+                  <Button
+                    type="submit"
+                    disabled={isAnalyzingGithub}
+                    size="sm"
+                    className="gap-1.5 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white"
+                  >
+                    {isAnalyzingGithub ? (
+                      <>
+                        <Loader2 className="size-3.5 animate-spin" />
+                        <span>Parsing AST...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="size-3.5" />
+                        <span>Parse Repo</span>
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </form>
+
+            {/* Analysis Result Output */}
+            {githubAnalysis && (
+              <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-3 animate-in fade-in-50">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h4 className="text-sm font-bold text-foreground flex items-center gap-1.5">
+                      {githubAnalysis.projectTitle}
+                      <span className="text-[10px] font-semibold bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                        {githubAnalysis.complexityLevel}
+                      </span>
+                    </h4>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {githubAnalysis.architectureSummary}
+                    </p>
+                  </div>
+                  {githubAnalysis.stars > 0 && (
+                    <div className="flex items-center gap-1 text-xs font-semibold text-amber-500">
+                      <Star className="size-3.5 fill-amber-500" />
+                      <span>{githubAnalysis.stars}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap gap-1.5">
+                  {githubAnalysis.primaryTechnologies.map((tech, idx) => (
+                    <span
+                      key={idx}
+                      className="text-[10px] font-medium bg-background border border-border px-2 py-0.5 rounded-md text-foreground"
+                    >
+                      {tech}
+                    </span>
+                  ))}
+                </div>
+
+                <div className="space-y-1.5 pt-2 border-t border-border/60">
+                  <span className="text-xs font-bold text-foreground flex items-center gap-1">
+                    <CheckCircle2 className="size-3.5 text-emerald-500" /> Synthesized Google XYZ Bullets:
+                  </span>
+                  <ul className="list-disc pl-4 space-y-1 text-xs text-muted-foreground leading-snug">
+                    {githubAnalysis.xyzBullets.map((bullet, idx) => (
+                      <li key={idx} className="text-foreground">{bullet}</li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <Button
+                    size="sm"
+                    onClick={handleAddGithubProjectToResume}
+                    className="gap-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-button"
+                  >
+                    <Check className="size-3.5" /> Add to Resume Projects
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Multi-Persona Branching Modal */}
+      {isPersonaModalOpen && branchedPersonas && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm print:hidden">
+          <div className="w-full max-w-3xl rounded-2xl border border-border bg-background p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
+              <div className="flex items-center gap-2.5">
+                <span className="grid size-9 place-items-center rounded-xl bg-indigo-600 text-white shadow-button">
+                  <GitBranch className="size-5" />
+                </span>
+                <div>
+                  <h3 className="text-base font-extrabold text-foreground">
+                    Multi-Persona Specialized Resumes
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Truth-grounded evidence branched into 3 specialized high-impact target personas.
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsPersonaModalOpen(false)}
+                className="size-8 p-0 text-muted-foreground"
+              >
+                ✕
+              </Button>
+            </div>
+
+            {/* Persona Switcher Tabs */}
+            <div className="grid grid-cols-3 gap-2 p-1 bg-muted/40 rounded-xl border border-border">
+              {(
+                [
+                  { id: "fullstack", label: "Full-Stack Engineer", icon: Code },
+                  { id: "backend", label: "Backend / Distributed", icon: Cpu },
+                  { id: "ai_ml", label: "AI & ML Systems", icon: Sparkles },
+                ] as const
+              ).map((tab) => {
+                const Icon = tab.icon;
+                const isActive = selectedPersonaTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setSelectedPersonaTab(tab.id)}
+                    className={cn(
+                      "flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-bold transition-all",
+                      isActive
+                        ? "bg-background text-foreground shadow-xs font-extrabold border border-border"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <Icon className="size-3.5 text-primary" />
+                    <span className="truncate">{tab.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Selected Persona Spec Sheet */}
+            {branchedPersonas[selectedPersonaTab] && (
+              <div className="space-y-4 rounded-xl border border-border bg-card p-5">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h4 className="text-base font-extrabold text-foreground">
+                      {branchedPersonas[selectedPersonaTab].displayName}
+                    </h4>
+                    <p className="text-xs font-semibold text-primary mt-0.5">
+                      {branchedPersonas[selectedPersonaTab].targetRole}
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => handleApplyPersona(branchedPersonas[selectedPersonaTab])}
+                    className="gap-1.5 text-xs font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-button"
+                  >
+                    <Check className="size-3.5" /> Apply to Canvas
+                  </Button>
+                </div>
+
+                <div className="rounded-lg bg-muted/30 p-3 text-xs leading-relaxed text-muted-foreground border border-border/60">
+                  <strong className="text-foreground">Tailored Executive Summary: </strong>
+                  {branchedPersonas[selectedPersonaTab].tailoredSummary}
+                </div>
+
+                <div className="space-y-2 text-xs">
+                  <h5 className="font-bold text-foreground">Reweighted Skill Taxonomy:</h5>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-muted-foreground">
+                    <div className="p-2 rounded-lg bg-background border border-border">
+                      <strong className="text-foreground">Languages: </strong>
+                      {branchedPersonas[selectedPersonaTab].skillsTaxonomy.languages}
+                    </div>
+                    <div className="p-2 rounded-lg bg-background border border-border">
+                      <strong className="text-foreground">Frameworks: </strong>
+                      {branchedPersonas[selectedPersonaTab].skillsTaxonomy.frameworks}
+                    </div>
+                    <div className="p-2 rounded-lg bg-background border border-border">
+                      <strong className="text-foreground">Cloud / Infra: </strong>
+                      {branchedPersonas[selectedPersonaTab].skillsTaxonomy.cloud}
+                    </div>
+                    <div className="p-2 rounded-lg bg-background border border-border">
+                      <strong className="text-foreground">Databases: </strong>
+                      {branchedPersonas[selectedPersonaTab].skillsTaxonomy.databases}
+                    </div>
+                  </div>
+                </div>
+
+                {branchedPersonas[selectedPersonaTab].highlightedBullets.length > 0 && (
+                  <div className="space-y-1.5 pt-2 border-t border-border/60 text-xs">
+                    <h5 className="font-bold text-foreground">Specialized Highlight Bullets:</h5>
+                    <ul className="list-disc pl-4 space-y-1 text-muted-foreground">
+                      {branchedPersonas[selectedPersonaTab].highlightedBullets.map((b, i) => (
+                        <li key={i} className="text-foreground">{b}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* LaTeX ATS Export Modal */}
       {isLatexModalOpen && (
@@ -749,50 +1130,53 @@ function ResumeBuilderPage() {
                 </span>
                 <div>
                   <h3 className="text-base font-extrabold text-foreground">
-                    JobMate Multi-Agent Execution Pipeline
+                    Multi-Agent Resume Tailoring Pipeline
                   </h3>
                   <p className="text-xs text-muted-foreground">
-                    Decomposes JD, plans strategy, synthesizes XYZ bullets, and verifies claims through reflection.
+                    StateGraph DAG: JD Decomposer → Planner → RAG Synthesizer → Critic Loop → Deterministic LaTeX
                   </p>
                 </div>
               </div>
-
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => setIsAgentModalOpen(false)}
-                className="size-8 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground grid place-items-center"
+                className="size-8 p-0 text-muted-foreground"
               >
                 ✕
-              </button>
+              </Button>
             </div>
 
             {/* Input Form */}
             {!pipelineResult && (
               <form onSubmit={handleRunMultiAgentPipeline} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-foreground">Target Company (Optional)</label>
+                  <label className="block text-xs font-semibold text-foreground">
+                    Target Company Name (Optional)
+                  </label>
                   <input
                     type="text"
                     value={targetCompanyName}
                     onChange={(e) => setTargetCompanyName(e.target.value)}
-                    placeholder="e.g. Stripe, OpenAI, Google, Datadog"
-                    className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground focus:outline-none focus:border-primary"
+                    placeholder="e.g. Stripe, Linear, Vercel, OpenAI"
+                    className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground focus:border-primary focus:outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-foreground">Target Job Description (JD)</label>
+                  <label className="block text-xs font-semibold text-foreground">
+                    Target Job Description (Paste JD Text)
+                  </label>
                   <textarea
                     rows={6}
-                    required
                     value={targetJdText}
                     onChange={(e) => setTargetJdText(e.target.value)}
-                    placeholder="Paste the full job requirements and technical qualifications here..."
-                    className="mt-1 w-full rounded-xl border border-border bg-background p-3 text-xs leading-relaxed text-foreground focus:outline-none focus:border-primary"
+                    placeholder="Paste the full job description text here..."
+                    className="mt-1 w-full rounded-xl border border-border bg-background p-3 text-xs leading-relaxed text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
                   />
                 </div>
 
-                <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
+                <div className="flex items-center justify-between pt-2 border-t border-border">
                   <Button
                     type="button"
                     variant="outline"
@@ -1099,12 +1483,9 @@ function ResumeBuilderPage() {
 
             {/* 3. Work Experience Form */}
             {activeFormTab === "experience" && (
-              <div className="space-y-5">
+              <div className="space-y-4">
                 <div className="flex items-center justify-between pb-3 border-b border-border">
-                  <div>
-                    <h3 className="text-sm font-bold text-foreground">Work Experience</h3>
-                    <p className="text-[11px] text-muted-foreground">Action-driven accomplishments using the XYZ formula.</p>
-                  </div>
+                  <h3 className="text-sm font-bold text-foreground">Work Experience</h3>
                   <Button
                     size="sm"
                     variant="outline"
@@ -1112,12 +1493,14 @@ function ResumeBuilderPage() {
                       const newExp = {
                         id: Date.now().toString(),
                         role: "Software Engineer",
-                        company: "Tech Company",
-                        location: "Remote",
-                        startDate: "2024",
+                        company: "Company Name",
+                        location: "City, State",
+                        startDate: "2023",
                         endDate: "Present",
                         current: true,
-                        bullets: ["Engineered features driving measurable customer value and team velocity."],
+                        bullets: [
+                          "Accomplished [X] as measured by [Y], by doing [Z].",
+                        ],
                       };
                       setResumeData({
                         ...resumeData,
@@ -1132,53 +1515,18 @@ function ResumeBuilderPage() {
 
                 {resumeData.experiences.map((exp, expIdx) => (
                   <div key={exp.id} className="rounded-xl border border-border bg-section/60 p-4 space-y-3">
-                    <div className="flex items-start justify-between">
-                      <div className="grid grid-cols-2 gap-2 flex-1 mr-2">
-                        <input
-                          type="text"
-                          value={exp.role}
-                          onChange={(e) => {
-                            const updated = [...resumeData.experiences];
-                            updated[expIdx].role = e.target.value;
-                            setResumeData({ ...resumeData, experiences: updated });
-                          }}
-                          placeholder="Job Title / Role"
-                          className="rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs font-semibold text-foreground focus:outline-none"
-                        />
-                        <input
-                          type="text"
-                          value={exp.company}
-                          onChange={(e) => {
-                            const updated = [...resumeData.experiences];
-                            updated[expIdx].company = e.target.value;
-                            setResumeData({ ...resumeData, experiences: updated });
-                          }}
-                          placeholder="Company Name"
-                          className="rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs font-semibold text-foreground focus:outline-none"
-                        />
-                        <input
-                          type="text"
-                          value={exp.startDate}
-                          onChange={(e) => {
-                            const updated = [...resumeData.experiences];
-                            updated[expIdx].startDate = e.target.value;
-                            setResumeData({ ...resumeData, experiences: updated });
-                          }}
-                          placeholder="Start Date"
-                          className="rounded-lg border border-border bg-background px-2.5 py-1 text-[11px] text-foreground focus:outline-none"
-                        />
-                        <input
-                          type="text"
-                          value={exp.endDate}
-                          onChange={(e) => {
-                            const updated = [...resumeData.experiences];
-                            updated[expIdx].endDate = e.target.value;
-                            setResumeData({ ...resumeData, experiences: updated });
-                          }}
-                          placeholder="End Date (or Present)"
-                          className="rounded-lg border border-border bg-background px-2.5 py-1 text-[11px] text-foreground focus:outline-none"
-                        />
-                      </div>
+                    <div className="flex items-start justify-between gap-2">
+                      <input
+                        type="text"
+                        value={exp.role}
+                        onChange={(e) => {
+                          const updated = [...resumeData.experiences];
+                          updated[expIdx].role = e.target.value;
+                          setResumeData({ ...resumeData, experiences: updated });
+                        }}
+                        placeholder="Job Title / Role"
+                        className="flex-1 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs font-semibold text-foreground focus:outline-none"
+                      />
                       <button
                         type="button"
                         onClick={() => {
@@ -1188,65 +1536,120 @@ function ResumeBuilderPage() {
                           });
                         }}
                         className="text-muted-foreground hover:text-destructive p-1"
-                        title="Delete Role"
                       >
                         <Trash2 className="size-4" />
                       </button>
                     </div>
 
-                    {/* Bullets List */}
-                    <div className="space-y-2 pt-2 border-t border-border/70">
-                      <span className="text-[11px] font-semibold text-foreground">Bullet Points:</span>
-                      {exp.bullets.map((bullet, bIdx) => {
-                        const actionKey = `${exp.id}-${bIdx}`;
-                        const isEnhancing = enhancingBulletId === actionKey;
-                        return (
-                          <div key={bIdx} className="flex items-start gap-2">
-                            <textarea
-                              rows={2}
-                              value={bullet}
-                              onChange={(e) => {
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="text"
+                        value={exp.company}
+                        onChange={(e) => {
+                          const updated = [...resumeData.experiences];
+                          updated[expIdx].company = e.target.value;
+                          setResumeData({ ...resumeData, experiences: updated });
+                        }}
+                        placeholder="Company"
+                        className="rounded-lg border border-border bg-background px-2.5 py-1 text-xs text-foreground focus:outline-none"
+                      />
+                      <input
+                        type="text"
+                        value={exp.location}
+                        onChange={(e) => {
+                          const updated = [...resumeData.experiences];
+                          updated[expIdx].location = e.target.value;
+                          setResumeData({ ...resumeData, experiences: updated });
+                        }}
+                        placeholder="Location"
+                        className="rounded-lg border border-border bg-background px-2.5 py-1 text-xs text-foreground focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="text"
+                        value={exp.startDate}
+                        onChange={(e) => {
+                          const updated = [...resumeData.experiences];
+                          updated[expIdx].startDate = e.target.value;
+                          setResumeData({ ...resumeData, experiences: updated });
+                        }}
+                        placeholder="Start Date (e.g. 2022)"
+                        className="rounded-lg border border-border bg-background px-2.5 py-1 text-xs text-foreground focus:outline-none"
+                      />
+                      <input
+                        type="text"
+                        value={exp.endDate}
+                        onChange={(e) => {
+                          const updated = [...resumeData.experiences];
+                          updated[expIdx].endDate = e.target.value;
+                          setResumeData({ ...resumeData, experiences: updated });
+                        }}
+                        placeholder="End Date (or Present)"
+                        className="rounded-lg border border-border bg-background px-2.5 py-1 text-xs text-foreground focus:outline-none"
+                      />
+                    </div>
+
+                    {/* Bullets */}
+                    <div className="space-y-2 pt-2 border-t border-border">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-semibold text-muted-foreground">
+                          Accomplishment Bullets (Google XYZ Formula)
+                        </label>
+                      </div>
+
+                      {exp.bullets.map((bullet, bIdx) => (
+                        <div key={bIdx} className="flex items-start gap-1.5">
+                          <textarea
+                            rows={2}
+                            value={bullet}
+                            onChange={(e) => {
+                              const updated = [...resumeData.experiences];
+                              updated[expIdx].bullets[bIdx] = e.target.value;
+                              setResumeData({ ...resumeData, experiences: updated });
+                            }}
+                            className="flex-1 rounded-lg border border-border bg-background p-2 text-xs text-foreground focus:outline-none"
+                          />
+                          <div className="flex flex-col gap-1">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleEnhanceBullet(exp.id, bIdx, bullet)}
+                              disabled={enhancingBulletId === `${exp.id}-${bIdx}`}
+                              className="size-7 p-0 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950"
+                              title="✨ AI Enhance with Metrics & XYZ Formula"
+                            >
+                              {enhancingBulletId === `${exp.id}-${bIdx}` ? (
+                                <Loader2 className="size-3.5 animate-spin" />
+                              ) : (
+                                <Sparkles className="size-3.5" />
+                              )}
+                            </Button>
+                            <button
+                              type="button"
+                              onClick={() => {
                                 const updated = [...resumeData.experiences];
-                                updated[expIdx].bullets[bIdx] = e.target.value;
+                                updated[expIdx].bullets = updated[expIdx].bullets.filter((_, i) => i !== bIdx);
                                 setResumeData({ ...resumeData, experiences: updated });
                               }}
-                              className="flex-1 rounded-lg border border-border bg-background p-2 text-[11px] text-foreground focus:outline-none"
-                            />
-                            <div className="flex flex-col gap-1">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleEnhanceBullet(exp.id, bIdx, bullet)}
-                                disabled={isEnhancing}
-                                className="h-7 px-2 text-[10px] font-bold text-indigo-600 border-indigo-200 hover:bg-indigo-50 dark:hover:bg-indigo-950"
-                                title="Enhance with GPT-4o-mini XYZ formula"
-                              >
-                                <Sparkles className="size-3" />
-                                <span>{isEnhancing ? "..." : "AI"}</span>
-                              </Button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const updated = [...resumeData.experiences];
-                                  updated[expIdx].bullets = updated[expIdx].bullets.filter((_, i) => i !== bIdx);
-                                  setResumeData({ ...resumeData, experiences: updated });
-                                }}
-                                className="text-muted-foreground hover:text-destructive text-[10px] p-1 text-center"
-                              >
-                                ✕
-                              </button>
-                            </div>
+                              className="size-7 p-0 text-muted-foreground hover:text-destructive flex items-center justify-center"
+                            >
+                              <Trash2 className="size-3.5" />
+                            </button>
                           </div>
-                        );
-                      })}
-                      <div className="flex items-center gap-2 pt-1">
+                        </div>
+                      ))}
+
+                      <div className="flex items-center justify-between pt-1">
                         <Button
                           type="button"
-                          size="sm"
                           variant="ghost"
+                          size="sm"
                           onClick={() => {
                             const updated = [...resumeData.experiences];
-                            updated[expIdx].bullets.push("Engineered scalable solution improving performance and system metrics.");
+                            updated[expIdx].bullets.push("Engineered and delivered core feature, accelerating workflow by 20%.");
                             setResumeData({ ...resumeData, experiences: updated });
                           }}
                           className="h-6 text-[10px] text-primary"
@@ -1262,7 +1665,7 @@ function ResumeBuilderPage() {
                           className="h-6 gap-1 px-2 text-[10px] font-bold text-indigo-600 border-indigo-200 hover:bg-indigo-50 dark:hover:bg-indigo-950"
                         >
                           <Sparkles className="size-3" />
-                          <span>{generatingRoleBulletsId === exp.id ? "Generating..." : "✨ AI Generate Bullets for Role"}</span>
+                          <span>{generatingRoleBulletsId === exp.id ? "Generating..." : "✨ AI Generate Bullets"}</span>
                         </Button>
                       </div>
                     </div>
@@ -1275,27 +1678,41 @@ function ResumeBuilderPage() {
             {activeFormTab === "projects" && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between pb-3 border-b border-border">
-                  <h3 className="text-sm font-bold text-foreground">Featured Projects</h3>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      const newProj = {
-                        id: Date.now().toString(),
-                        name: "Full Stack Application",
-                        technologies: "React, Node.js, PostgreSQL",
-                        link: "https://github.com/username/project",
-                        bullets: ["Built end-to-end full stack application with authentication and data persistence."],
-                      };
-                      setResumeData({
-                        ...resumeData,
-                        projects: [newProj, ...resumeData.projects],
-                      });
-                    }}
-                    className="gap-1 text-xs"
-                  >
-                    <Plus className="size-3.5" /> Add Project
-                  </Button>
+                  <div>
+                    <h3 className="text-sm font-bold text-foreground">Featured Projects</h3>
+                    <p className="text-[11px] text-muted-foreground">Highlight open-source, full-stack, and technical architecture.</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setIsGithubModalOpen(true)}
+                      className="gap-1 text-xs border-indigo-500/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/10 font-semibold"
+                    >
+                      <FolderGit2 className="size-3.5" />
+                      <span>Import from GitHub</span>
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        const newProj = {
+                          id: Date.now().toString(),
+                          name: "Full Stack Application",
+                          technologies: "React, Node.js, PostgreSQL",
+                          link: "https://github.com/username/project",
+                          bullets: ["Built end-to-end full stack application with authentication and data persistence."],
+                        };
+                        setResumeData({
+                          ...resumeData,
+                          projects: [newProj, ...resumeData.projects],
+                        });
+                      }}
+                      className="gap-1 text-xs"
+                    >
+                      <Plus className="size-3.5" /> Add Project
+                    </Button>
+                  </div>
                 </div>
 
                 {resumeData.projects.map((proj, pIdx) => (
@@ -1349,6 +1766,55 @@ function ResumeBuilderPage() {
                       placeholder="Project URL / GitHub"
                       className="w-full rounded-lg border border-border bg-background px-2.5 py-1 text-[11px] text-foreground focus:outline-none"
                     />
+
+                    {/* Project Bullets */}
+                    <div className="space-y-1.5 pt-2 border-t border-border">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-semibold text-muted-foreground">
+                          Project Achievements / Architecture Bullets
+                        </label>
+                      </div>
+
+                      {proj.bullets.map((b, bIdx) => (
+                        <div key={bIdx} className="flex items-start gap-1.5">
+                          <textarea
+                            rows={2}
+                            value={b}
+                            onChange={(e) => {
+                              const updated = [...resumeData.projects];
+                              updated[pIdx].bullets[bIdx] = e.target.value;
+                              setResumeData({ ...resumeData, projects: updated });
+                            }}
+                            className="flex-1 rounded-lg border border-border bg-background p-2 text-xs text-foreground focus:outline-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = [...resumeData.projects];
+                              updated[pIdx].bullets = updated[pIdx].bullets.filter((_, i) => i !== bIdx);
+                              setResumeData({ ...resumeData, projects: updated });
+                            }}
+                            className="size-7 p-0 text-muted-foreground hover:text-destructive flex items-center justify-center"
+                          >
+                            <Trash2 className="size-3.5" />
+                          </button>
+                        </div>
+                      ))}
+
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          const updated = [...resumeData.projects];
+                          updated[pIdx].bullets.push("Architected and deployed application with high reliability and performance.");
+                          setResumeData({ ...resumeData, projects: updated });
+                        }}
+                        className="h-6 text-[10px] text-primary"
+                      >
+                        + Add Bullet Point
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1420,8 +1886,44 @@ function ResumeBuilderPage() {
                           updated[eIdx].institution = e.target.value;
                           setResumeData({ ...resumeData, education: updated });
                         }}
-                        placeholder="Institution / College"
-                        className="rounded-lg border border-border bg-background px-2.5 py-1 text-[11px] text-foreground focus:outline-none"
+                        placeholder="Institution / University"
+                        className="rounded-lg border border-border bg-background px-2.5 py-1 text-xs text-foreground focus:outline-none"
+                      />
+                      <input
+                        type="text"
+                        value={edu.location}
+                        onChange={(e) => {
+                          const updated = [...resumeData.education];
+                          updated[eIdx].location = e.target.value;
+                          setResumeData({ ...resumeData, education: updated });
+                        }}
+                        placeholder="Location"
+                        className="rounded-lg border border-border bg-background px-2.5 py-1 text-xs text-foreground focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2">
+                      <input
+                        type="text"
+                        value={edu.startDate}
+                        onChange={(e) => {
+                          const updated = [...resumeData.education];
+                          updated[eIdx].startDate = e.target.value;
+                          setResumeData({ ...resumeData, education: updated });
+                        }}
+                        placeholder="Start Date"
+                        className="rounded-lg border border-border bg-background px-2.5 py-1 text-xs text-foreground focus:outline-none"
+                      />
+                      <input
+                        type="text"
+                        value={edu.endDate}
+                        onChange={(e) => {
+                          const updated = [...resumeData.education];
+                          updated[eIdx].endDate = e.target.value;
+                          setResumeData({ ...resumeData, education: updated });
+                        }}
+                        placeholder="End Date"
+                        className="rounded-lg border border-border bg-background px-2.5 py-1 text-xs text-foreground focus:outline-none"
                       />
                       <input
                         type="text"
@@ -1432,7 +1934,7 @@ function ResumeBuilderPage() {
                           setResumeData({ ...resumeData, education: updated });
                         }}
                         placeholder="GPA / Honors"
-                        className="rounded-lg border border-border bg-background px-2.5 py-1 text-[11px] text-foreground focus:outline-none"
+                        className="rounded-lg border border-border bg-background px-2.5 py-1 text-xs text-foreground focus:outline-none"
                       />
                     </div>
                   </div>
@@ -1446,17 +1948,16 @@ function ResumeBuilderPage() {
                 <div className="flex items-center justify-between pb-3 border-b border-border">
                   <div>
                     <h3 className="text-sm font-bold text-foreground">Technical Skills</h3>
-                    <p className="text-[11px] text-muted-foreground">Comma-separated list of technologies for ATS parser match.</p>
+                    <p className="text-[11px] text-muted-foreground">Categorized taxonomy for optimal ATS semantic parsing.</p>
                   </div>
                   <Button
-                    type="button"
                     size="sm"
                     onClick={handleSuggestSkills}
                     disabled={isSuggestingSkills}
                     className="gap-1.5 rounded-lg text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white"
                   >
                     <Sparkles className="size-3.5" />
-                    <span>{isSuggestingSkills ? "Analyzing..." : "✨ AI Suggest Skills"}</span>
+                    <span>{isSuggestingSkills ? "Suggesting..." : "✨ AI Suggest Skills"}</span>
                   </Button>
                 </div>
 
@@ -1520,202 +2021,12 @@ function ResumeBuilderPage() {
 
         {/* Right Column: Live ATS Resume Canvas (7 Cols on desktop) */}
         <section className="lg:col-span-7 flex flex-col gap-4">
-          {/* Template Bar & Controls */}
-          <div className="flex items-center justify-between rounded-xl border border-border bg-background p-2.5 shadow-xs print:hidden">
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs font-semibold text-muted-foreground mr-1">Template:</span>
-              {[
-                { id: "modern", label: "Modern ATS" },
-                { id: "classic", label: "Classic Serif" },
-                { id: "minimal", label: "Minimalist" },
-              ].map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => setTemplate(t.id as any)}
-                  className={cn(
-                    "rounded-lg px-2.5 py-1 text-xs font-medium transition-all",
-                    template === t.id
-                      ? "bg-primary text-primary-foreground font-bold shadow-xs"
-                      : "bg-section text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-
-            <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-              <CheckCircle2 className="size-3.5" /> 100% ATS Compliant
-            </span>
-          </div>
-
-          {/* ATS Audit Score Bar (If performed) */}
-          {atsAudit && (
-            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 shadow-xs print:hidden">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="grid size-8 place-items-center rounded-lg bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-extrabold text-sm">
-                    {atsAudit.overallScore}%
-                  </span>
-                  <div>
-                    <p className="text-xs font-bold text-foreground">ATS Readiness Score</p>
-                    <p className="text-[10px] text-muted-foreground">Passed all structural parsing checks.</p>
-                  </div>
-                </div>
-                <div className="flex gap-2 text-[10px] font-semibold">
-                  <span className="rounded bg-background px-2 py-0.5 border border-border">
-                    Keyword: {atsAudit.keywordScore}%
-                  </span>
-                  <span className="rounded bg-background px-2 py-0.5 border border-border">
-                    Impact: {atsAudit.impactScore}%
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Actual Rendered Resume Document (Printed / Exported Cleanly) */}
-          <div
-            id="resume-document"
-            className={cn(
-              "w-full bg-white text-slate-900 p-8 sm:p-12 rounded-2xl border border-border shadow-card min-h-[900px] select-text font-sans",
-              template === "classic" && "font-serif",
-              template === "minimal" && "font-mono text-xs"
-            )}
-          >
-            {/* Header */}
-            <div className="border-b border-slate-300 pb-3 text-center sm:text-left">
-              <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between">
-                <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-950">
-                  {resumeData.personal.name || "Your Name"}
-                </h1>
-                <span className="text-xs font-bold text-primary sm:text-sm">
-                  {resumeData.personal.targetRole}
-                </span>
-              </div>
-
-              {/* Contact Subhead */}
-              <div className="mt-1.5 flex flex-wrap items-center justify-center sm:justify-start gap-x-3 gap-y-1 text-[11px] text-slate-600">
-                {resumeData.personal.location && <span>{resumeData.personal.location}</span>}
-                {resumeData.personal.email && <span>• {resumeData.personal.email}</span>}
-                {resumeData.personal.phone && <span>• {resumeData.personal.phone}</span>}
-                {resumeData.personal.github && <span>• {resumeData.personal.github.replace(/^https?:\/\//, "")}</span>}
-                {resumeData.personal.linkedin && <span>• {resumeData.personal.linkedin.replace(/^https?:\/\//, "")}</span>}
-              </div>
-            </div>
-
-            {/* Professional Summary */}
-            {resumeData.summary && (
-              <div className="mt-4">
-                <h2 className="text-xs font-bold uppercase tracking-wider text-slate-950 border-b border-slate-200 pb-0.5">
-                  Professional Summary
-                </h2>
-                <p className="mt-1 text-xs leading-relaxed text-slate-700">{resumeData.summary}</p>
-              </div>
-            )}
-
-            {/* Work Experience */}
-            {resumeData.experiences.length > 0 && (
-              <div className="mt-4 space-y-3">
-                <h2 className="text-xs font-bold uppercase tracking-wider text-slate-950 border-b border-slate-200 pb-0.5">
-                  Work Experience
-                </h2>
-
-                {resumeData.experiences.map((exp) => (
-                  <div key={exp.id} className="space-y-1">
-                    <div className="flex items-baseline justify-between text-xs font-bold text-slate-950">
-                      <span>
-                        {exp.role} <span className="font-normal text-slate-600">— {exp.company}</span>
-                      </span>
-                      <span className="text-[11px] font-normal text-slate-500">
-                        {exp.startDate} – {exp.endDate}
-                      </span>
-                    </div>
-
-                    <ul className="list-disc pl-4 space-y-0.5 text-xs text-slate-700 leading-snug">
-                      {exp.bullets.map((b, i) => (
-                        <li key={i}>{b}</li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Featured Projects */}
-            {resumeData.projects.length > 0 && (
-              <div className="mt-4 space-y-2.5">
-                <h2 className="text-xs font-bold uppercase tracking-wider text-slate-950 border-b border-slate-200 pb-0.5">
-                  Featured Projects
-                </h2>
-
-                {resumeData.projects.map((proj) => (
-                  <div key={proj.id} className="space-y-0.5">
-                    <div className="flex items-baseline justify-between text-xs font-bold text-slate-950">
-                      <span>
-                        {proj.name} <span className="font-normal text-slate-500">({proj.technologies})</span>
-                      </span>
-                      {proj.link && (
-                        <span className="text-[10px] font-normal text-primary">
-                          {proj.link.replace(/^https?:\/\//, "")}
-                        </span>
-                      )}
-                    </div>
-                    {proj.bullets.length > 0 && (
-                      <ul className="list-disc pl-4 text-xs text-slate-700 leading-snug">
-                        {proj.bullets.map((b, i) => (
-                          <li key={i}>{b}</li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Technical Skills */}
-            <div className="mt-4 space-y-1">
-              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-950 border-b border-slate-200 pb-0.5">
-                Technical Skills & Competencies
-              </h2>
-              <div className="text-xs text-slate-700 space-y-0.5">
-                {resumeData.skills.languages.length > 0 && (
-                  <p>
-                    <strong className="text-slate-900">Languages:</strong> {resumeData.skills.languages.join(", ")}
-                  </p>
-                )}
-                {resumeData.skills.frameworks.length > 0 && (
-                  <p>
-                    <strong className="text-slate-900">Frameworks:</strong> {resumeData.skills.frameworks.join(", ")}
-                  </p>
-                )}
-                {resumeData.skills.tools.length > 0 && (
-                  <p>
-                    <strong className="text-slate-900">Tools & Databases:</strong> {resumeData.skills.tools.join(", ")}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Education */}
-            {resumeData.education.length > 0 && (
-              <div className="mt-4 space-y-1.5">
-                <h2 className="text-xs font-bold uppercase tracking-wider text-slate-950 border-b border-slate-200 pb-0.5">
-                  Education
-                </h2>
-
-                {resumeData.education.map((edu) => (
-                  <div key={edu.id} className="flex items-baseline justify-between text-xs text-slate-800">
-                    <div>
-                      <strong className="text-slate-950">{edu.degree}</strong> • {edu.institution}
-                    </div>
-                    <span className="text-[11px] text-slate-500">{edu.score || `${edu.startDate} – ${edu.endDate}`}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <ResumePaperCanvas
+            resumeData={resumeData}
+            template={template}
+            onTemplateChange={setTemplate}
+            atsScore={atsAudit?.overallScore}
+          />
         </section>
       </main>
     </div>
