@@ -255,7 +255,7 @@ function TemplatesPage() {
       <div className="space-y-8">
         {/* Header Banner */}
         <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 p-6 md:p-8 shadow-sm">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="space-y-2 max-w-2xl">
               <div className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 px-3 py-1 text-xs font-semibold text-indigo-700 dark:text-indigo-400 border border-indigo-200/60 dark:border-indigo-800/60">
                 <Sparkles className="size-3.5" />
@@ -264,16 +264,16 @@ function TemplatesPage() {
               <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
                 ATS-Proof Resume Templates
               </h1>
-              <p className="text-sm md:text-base text-slate-600 dark:text-slate-400 leading-relaxed">
+              <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
                 Every template is compiled with single-column geometry, standard system fonts, and semantic AST tags to score 98%+ on Workday, Taleo, Greenhouse, and Lever.
               </p>
             </div>
-            <div className="flex items-center gap-3 shrink-0">
+            <div className="flex items-center gap-3 shrink-0 self-start sm:self-center">
               <Link
                 to="/builder"
-                className={cn(buttonVariants({ variant: "default" }), "gap-2 shadow-button bg-indigo-600 hover:bg-indigo-700 text-white")}
+                className={cn(buttonVariants({ variant: "default" }), "gap-2 shadow-button bg-indigo-600 hover:bg-indigo-700 text-white whitespace-nowrap text-xs font-bold px-4 py-2 rounded-xl")}
               >
-                Open Resume Builder
+                <span>Open Resume Builder</span>
                 <ArrowRight className="size-4" />
               </Link>
             </div>

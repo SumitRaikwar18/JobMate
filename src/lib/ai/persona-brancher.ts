@@ -37,13 +37,27 @@ export async function branchCandidatePersonas(
   evidenceBank: CandidateEvidenceBank,
   candidateName: string
 ): Promise<Record<PersonaType, BranchedPersonaResume>> {
+  const experiences = (evidenceBank.evidenceItems || [])
+    .filter((e) => e.category === "experience")
+    .map((e) => ({ role: e.title, company: e.organization || "", bullets: e.verifiedClaims || [] }));
+
+  const projects = (evidenceBank.evidenceItems || [])
+    .filter((e) => e.category === "project")
+    .map((p) => ({ title: p.title, tech: (p.technologiesUsed || []).join(", "), bullets: p.verifiedClaims || [] }));
+
+  const allSkills = Array.from(
+    new Set(
+      (evidenceBank.evidenceItems || []).flatMap((e) => e.technologiesUsed || [])
+    )
+  );
+
   const prompt = `Branch the following candidate's ground-truth evidence into 3 specialized technical resumes:
 
-Candidate Name: ${candidateName}
-Headline: ${evidenceBank.profile.headline || "Software Engineer"}
-Master Skills: ${JSON.stringify(evidenceBank.skills.map((s) => s.name))}
-Work Experiences: ${JSON.stringify(evidenceBank.experiences.map((e) => ({ role: e.position, company: e.company, bullets: e.bullets })))}
-Projects: ${JSON.stringify(evidenceBank.projects.map((p) => ({ title: p.title, tech: p.technologies, bullets: p.bullets })))}
+Candidate Name: ${candidateName || evidenceBank.fullName || "Candidate"}
+Target Role: ${evidenceBank.targetRole || "Software Engineer"}
+Master Skills: ${JSON.stringify(allSkills.length > 0 ? allSkills : ["TypeScript", "React", "Node.js", "Python", "SQL", "Docker", "AWS"])}
+Work Experiences: ${JSON.stringify(experiences)}
+Projects: ${JSON.stringify(projects)}
 
 Return a valid JSON object matching this schema:
 {
