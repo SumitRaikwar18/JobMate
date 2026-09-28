@@ -22,6 +22,7 @@ import {
   LayoutDashboard,
   Loader2,
   MessageSquare,
+  Pencil,
   Play,
   Plus,
   Printer,
@@ -308,6 +309,42 @@ function ResumeBuilderPage() {
   const [isCopilotThinking, setIsCopilotThinking] = useState(false);
   const copilotChatBottomRef = useRef<HTMLDivElement>(null);
 
+  // Inline Editable Resume Title State
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
+  const titleInputRef = useRef<HTMLInputElement>(null);
+
+  const startEditingTitle = () => {
+    setTitleDraft(resumeData.personal.targetRole || "Senior Frontend Engineer");
+    setIsEditingTitle(true);
+    setTimeout(() => {
+      titleInputRef.current?.focus();
+      titleInputRef.current?.select();
+    }, 50);
+  };
+
+  const saveTitleDraft = () => {
+    const nextRole = titleDraft.trim() || "Senior Frontend Engineer";
+    setResumeData((prev) => ({
+      ...prev,
+      personal: {
+        ...prev.personal,
+        targetRole: nextRole,
+      },
+    }));
+    setIsEditingTitle(false);
+    toast.success(`Resume title set to "${nextRole}"`);
+  };
+
+  const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      saveTitleDraft();
+    } else if (e.key === "Escape") {
+      setIsEditingTitle(false);
+    }
+  };
+
   const handleOpenLatexModal = () => {
     const generated = generateLatexResumeSource(resumeData as any, template === "classic" ? "classic" : "modern");
     setLatexSource(generated);
@@ -321,6 +358,7 @@ function ResumeBuilderPage() {
 
   const handleDownloadLatex = () => {
     const blob = new Blob([latexSource], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
     link.download = `${(resumeData.personal.name || "resume").toLowerCase().replace(/\s+/g, "_")}_ats.tex`;
@@ -877,12 +915,52 @@ function ResumeBuilderPage() {
           <span className="h-4 w-px bg-border" />
 
           <div className="flex items-center gap-1.5">
-            <span className="grid size-6 place-items-center rounded-md bg-primary text-primary-foreground text-xs font-bold">
+            <span className="grid size-6 place-items-center rounded-md bg-primary text-primary-foreground text-xs font-bold shrink-0">
               <FileCheck2 className="size-3.5" />
             </span>
-            <span className="text-xs font-bold text-foreground truncate max-w-[180px] sm:max-w-xs">
-              {resumeData.personal.targetRole || "ATS Resume Builder"}
-            </span>
+            {isEditingTitle ? (
+              <div className="flex items-center gap-1">
+                <input
+                  ref={titleInputRef}
+                  type="text"
+                  value={titleDraft}
+                  onChange={(e) => setTitleDraft(e.target.value)}
+                  onBlur={saveTitleDraft}
+                  onKeyDown={handleTitleKeyDown}
+                  placeholder="e.g. Senior Frontend Engineer"
+                  className="h-7 w-44 sm:w-60 rounded-md border border-primary bg-background px-2 text-xs font-bold text-foreground focus:outline-none focus:ring-1 focus:ring-primary shadow-sm"
+                />
+                <button
+                  type="button"
+                  onClick={saveTitleDraft}
+                  className="grid size-6 place-items-center rounded bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shrink-0 shadow-sm"
+                  title="Save title"
+                >
+                  <Check className="size-3.5" />
+                </button>
+              </div>
+            ) : (
+              <div
+                onClick={startEditingTitle}
+                className="group flex items-center gap-1.5 cursor-pointer rounded-md px-1.5 py-0.5 hover:bg-muted/70 transition-colors"
+                title="Click or use pencil to rename resume title"
+              >
+                <span className="text-xs font-bold text-foreground truncate max-w-[150px] sm:max-w-[220px] group-hover:text-primary transition-colors">
+                  {resumeData.personal.targetRole || "Senior Frontend Engineer"}
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    startEditingTitle();
+                  }}
+                  className="opacity-70 group-hover:opacity-100 hover:text-primary p-0.5 rounded transition-opacity"
+                  title="Rename resume title"
+                >
+                  <Pencil className="size-3 text-muted-foreground group-hover:text-primary" />
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
