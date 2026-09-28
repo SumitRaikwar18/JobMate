@@ -82,12 +82,21 @@ import {
 export const Route = createFileRoute("/builder")({
   head: () => ({
     meta: [
-      { title: "Live ATS Resume Builder — JobMate AI" },
-      { name: "description", content: "Build and tailor your ATS-optimized resume with AI in real time." },
-      { property: "og:title", content: "Live ATS Resume Builder — JobMate AI" },
-      { property: "og:description", content: "Interactive AI Resume Builder with multi-agent pipeline and ATS audits." },
+      { title: "Live ATS Resume Builder & AI Copilot — JobMate AI" },
+      { name: "description", content: "Build, tailor, and audit your ATS-optimized resume in real-time. Featuring autonomous tool-calling AI Copilot, multi-agent tailoring pipeline, GitHub repo analysis, and Overleaf LaTeX compiler." },
+      { name: "keywords", content: "live ATS resume builder, resume copilot, AI resume editor, LaTeX resume builder, GitHub resume parser, resume ATS score scanner, career AI tool" },
+      { property: "og:title", content: "Live ATS Resume Builder & AI Copilot — JobMate AI" },
+      { property: "og:description", content: "Interactive AI Resume Builder with multi-agent pipeline, GitHub project parsing, and real-time Overleaf LaTeX compilation." },
+      { property: "og:url", content: "https://jobmate-ebon.vercel.app/builder" },
       { property: "og:type", content: "website" },
+      { property: "og:image", content: "https://jobmate-ebon.vercel.app/og-banner.png" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Live ATS Resume Builder & AI Copilot — JobMate AI" },
+      { name: "twitter:description", content: "Interactive AI Resume Builder with multi-agent pipeline, GitHub project parsing, and real-time LaTeX compilation." },
+      { name: "twitter:image", content: "https://jobmate-ebon.vercel.app/og-banner.png" },
+    ],
+    links: [
+      { rel: "canonical", href: "https://jobmate-ebon.vercel.app/builder" },
     ],
   }),
   component: ResumeBuilderPage,

@@ -25,11 +25,21 @@ import { generateLatexResumeSource } from "@/lib/latex/latex-generator";
 export const Route = createFileRoute("/templates")({
   head: () => ({
     meta: [
-      { title: "ATS Resume Templates — JobMate" },
-      { name: "description", content: "Deterministic, 1-page single-column ATS LaTeX templates engineered for Overleaf and automated recruiting parsers." },
-      { property: "og:title", content: "ATS Resume Templates — JobMate" },
-      { property: "og:description", content: "Single-column, parseable LaTeX templates tailored for technical and engineering roles." },
+      { title: "ATS Resume Templates (LaTeX & Single-Column) — JobMate AI" },
+      { name: "description", content: "Explore deterministic 1-page single-column ATS LaTeX templates engineered for Overleaf pdflatex and automated recruiting parsers (Workday, Greenhouse, Lever)." },
+      { name: "keywords", content: "ATS resume templates, LaTeX resume template, Overleaf resume, single column resume template, tech resume template, software engineer resume template, parseable ATS template" },
+      { property: "og:title", content: "ATS Resume Templates (LaTeX & Single-Column) — JobMate AI" },
+      { property: "og:description", content: "Single-column, 99% ATS-compliant LaTeX templates engineered for modern tech, backend, fullstack, and AI engineering roles." },
+      { property: "og:url", content: "https://jobmate-ebon.vercel.app/templates" },
       { property: "og:type", content: "website" },
+      { property: "og:image", content: "https://jobmate-ebon.vercel.app/og-banner.png" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "ATS Resume Templates (LaTeX & Single-Column) — JobMate AI" },
+      { name: "twitter:description", content: "Explore deterministic 1-page single-column ATS LaTeX templates engineered for Overleaf and automated recruiting parsers." },
+      { name: "twitter:image", content: "https://jobmate-ebon.vercel.app/og-banner.png" },
+    ],
+    links: [
+      { rel: "canonical", href: "https://jobmate-ebon.vercel.app/templates" },
     ],
   }),
   component: TemplatesPage,

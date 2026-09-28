@@ -39,11 +39,21 @@ import {
 export const Route = createFileRoute("/applications")({
   head: () => ({
     meta: [
-      { title: "Application Pipeline Tracker — JobMate" },
-      { name: "description", content: "Track your job applications, interview stages, and offers with real-time status updates and AI cold outreach." },
-      { property: "og:title", content: "Application Pipeline Tracker — JobMate" },
-      { property: "og:description", content: "Manage your active job pipeline from Saved to Offer with Cold Outreach AI." },
+      { title: "Job Application Tracker & Cold Outreach AI — JobMate AI" },
+      { name: "description", content: "Track job applications, interview stages, and offers with real-time status updates, hiring manager DM generator, and AI cold outreach emails." },
+      { name: "keywords", content: "job application tracker, interview tracker, job search kanban, hiring manager DM generator, cold email recruiter, job pipeline" },
+      { property: "og:title", content: "Job Application Tracker & Cold Outreach AI — JobMate AI" },
+      { property: "og:description", content: "Manage your active job pipeline from Saved to Offer with AI Cold Outreach and Hiring Manager DMs." },
+      { property: "og:url", content: "https://jobmate-ebon.vercel.app/applications" },
       { property: "og:type", content: "website" },
+      { property: "og:image", content: "https://jobmate-ebon.vercel.app/og-banner.png" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Job Application Tracker & Cold Outreach AI — JobMate AI" },
+      { name: "twitter:description", content: "Track applications and generate high-converting hiring manager outreach emails with JobMate AI." },
+      { name: "twitter:image", content: "https://jobmate-ebon.vercel.app/og-banner.png" },
+    ],
+    links: [
+      { rel: "canonical", href: "https://jobmate-ebon.vercel.app/applications" },
     ],
   }),
   component: ApplicationsPage,

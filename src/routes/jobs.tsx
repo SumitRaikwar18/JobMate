@@ -37,11 +37,21 @@ import { scrapeJobUrlServerFn } from "@/lib/ai/job-scraper-server";
 export const Route = createFileRoute("/jobs")({
   head: () => ({
     meta: [
-      { title: "Job Matcher & Gap Analysis — JobMate" },
-      { name: "description", content: "Deconstruct job postings with AI to extract required skills, keywords, and semantic gap radar." },
-      { property: "og:title", content: "Job Matcher & Gap Analysis — JobMate" },
-      { property: "og:description", content: "Real-time semantic JD deconstruction and candidate gap analysis." },
+      { title: "AI Job Matcher & JD Gap Analysis Radar — JobMate AI" },
+      { name: "description", content: "Deconstruct technical job postings with AI to extract required skills, keywords, salary ranges, and semantic candidate gap radar analysis." },
+      { name: "keywords", content: "job description analyzer, JD gap radar, technical job matcher, ATS keyword extractor, job scraper AI, career radar" },
+      { property: "og:title", content: "AI Job Matcher & JD Gap Analysis Radar — JobMate AI" },
+      { property: "og:description", content: "Real-time semantic JD deconstruction and candidate gap analysis for software engineers and tech professionals." },
+      { property: "og:url", content: "https://jobmate-ebon.vercel.app/jobs" },
       { property: "og:type", content: "website" },
+      { property: "og:image", content: "https://jobmate-ebon.vercel.app/og-banner.png" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "AI Job Matcher & JD Gap Analysis Radar — JobMate AI" },
+      { name: "twitter:description", content: "Deconstruct technical job postings with AI to extract required skills, keywords, and semantic gap radar." },
+      { name: "twitter:image", content: "https://jobmate-ebon.vercel.app/og-banner.png" },
+    ],
+    links: [
+      { rel: "canonical", href: "https://jobmate-ebon.vercel.app/jobs" },
     ],
   }),
   component: JobsPage,

@@ -42,12 +42,21 @@ import { callOpenRouter } from "@/lib/ai/openrouter";
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
     meta: [
-      { title: "Dashboard — JobMate AI" },
-      { name: "description", content: "Build, tailor, and optimize your ATS resumes with AI." },
-      { property: "og:title", content: "Dashboard — JobMate AI" },
-      { property: "og:description", content: "Manage your resumes, track match scores, and sync with Telegram." },
+      { title: "Candidate Dashboard & Career Radar — JobMate AI" },
+      { name: "description", content: "Manage your ATS resumes, review real-time audit scores, track target applications, and sync career intelligence with JobMate AI." },
+      { name: "keywords", content: "candidate dashboard, resume manager, career radar, ATS score audit, job match score, telegram career sync" },
+      { property: "og:title", content: "Candidate Dashboard & Career Radar — JobMate AI" },
+      { property: "og:description", content: "Manage your resumes, track match scores, and sync with JobMate AI." },
+      { property: "og:url", content: "https://jobmate-ebon.vercel.app/dashboard" },
       { property: "og:type", content: "website" },
+      { property: "og:image", content: "https://jobmate-ebon.vercel.app/og-banner.png" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Candidate Dashboard & Career Radar — JobMate AI" },
+      { name: "twitter:description", content: "Manage resumes and track job applications with JobMate AI." },
+      { name: "twitter:image", content: "https://jobmate-ebon.vercel.app/og-banner.png" },
+    ],
+    links: [
+      { rel: "canonical", href: "https://jobmate-ebon.vercel.app/dashboard" },
     ],
   }),
   component: DashboardPage,

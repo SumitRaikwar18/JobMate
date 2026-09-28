@@ -29,12 +29,21 @@ import { useAuth } from "@/hooks/use-auth";
 export const Route = createFileRoute("/login")({
   head: () => ({
     meta: [
-      { title: "Sign In / Sign Up — JobMate" },
-      { name: "description", content: "Access your JobMate AI resume and career dashboard." },
-      { property: "og:title", content: "Sign In — JobMate" },
-      { property: "og:description", content: "Access your JobMate AI resume assistant." },
+      { title: "Sign In & Candidate Portal — JobMate AI" },
+      { name: "description", content: "Access your JobMate AI resume and career dashboard. Secure authentication with email magic link and Supabase." },
+      { name: "keywords", content: "jobmate login, resume builder sign in, candidate auth, career portal" },
+      { property: "og:title", content: "Sign In & Candidate Portal — JobMate AI" },
+      { property: "og:description", content: "Access your JobMate AI resume assistant and tailored application suites." },
+      { property: "og:url", content: "https://jobmate-ebon.vercel.app/login" },
       { property: "og:type", content: "website" },
+      { property: "og:image", content: "https://jobmate-ebon.vercel.app/og-banner.png" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Sign In & Candidate Portal — JobMate AI" },
+      { name: "twitter:description", content: "Sign in to JobMate AI to build ATS-proof resumes and track applications." },
+      { name: "twitter:image", content: "https://jobmate-ebon.vercel.app/og-banner.png" },
+    ],
+    links: [
+      { rel: "canonical", href: "https://jobmate-ebon.vercel.app/login" },
     ],
   }),
   component: AuthPage,
