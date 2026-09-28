@@ -79,6 +79,7 @@ import {
   executeCopilotChatTurn,
   type CopilotAction,
 } from "@/lib/ai/agents/copilot-tool-agent";
+import { subscribeCreditUpdates } from "@/lib/ai/rate-limiter";
 
 export const Route = createFileRoute("/builder")({
   head: () => ({
@@ -318,6 +319,30 @@ function ResumeBuilderPage() {
   const [copilotInput, setCopilotInput] = useState("");
   const [isCopilotThinking, setIsCopilotThinking] = useState(false);
   const copilotChatBottomRef = useRef<HTMLDivElement>(null);
+
+  // Real-time AI Credits Quota State
+  const [creditsQuota, setCreditsQuota] = useState<{ remaining: number; limit: number }>({
+    remaining: 25,
+    limit: 25,
+  });
+
+  useEffect(() => {
+    if (profile) {
+      const today = new Date().toISOString().split("T")[0];
+      const usedToday = profile.last_ai_request_date === today ? (profile.daily_ai_requests_count || 0) : 0;
+      const limit = profile.plan_tier === "pro" ? 250 : 25;
+      setCreditsQuota({
+        remaining: Math.max(0, limit - usedToday),
+        limit,
+      });
+    }
+
+    const unsubscribe = subscribeCreditUpdates(({ remaining, limit }) => {
+      setCreditsQuota({ remaining, limit });
+    });
+
+    return () => unsubscribe();
+  }, [profile]);
 
   // Inline Editable Resume Title State
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -978,10 +1003,10 @@ function ResumeBuilderPage() {
           <Link
             to="/settings"
             className="flex items-center gap-1 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-1 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 transition-colors"
-            title="Daily AI Credits remaining"
+            title={`Daily AI Credits: ${creditsQuota.remaining}/${creditsQuota.limit} requests remaining`}
           >
             <Zap className="size-3 fill-indigo-600 dark:fill-indigo-400" />
-            <span className="font-mono text-[11px]">25/25</span>
+            <span className="font-mono text-[11px]">{creditsQuota.remaining}/{creditsQuota.limit}</span>
             <span className="hidden md:inline text-[10px] text-indigo-500">Credits</span>
           </Link>
 

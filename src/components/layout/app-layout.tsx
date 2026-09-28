@@ -33,7 +33,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { JobMateLogo, JobMateEmblem } from "@/components/brand/jobmate-logo";
-import { getAiQuotaStatus } from "@/lib/ai/rate-limiter";
+import { getAiQuotaStatus, subscribeCreditUpdates } from "@/lib/ai/rate-limiter";
 
 export interface AppLayoutProps {
   children: ReactNode;
@@ -52,14 +52,32 @@ export function AppLayout({ children, activeNav }: AppLayoutProps) {
   const userMenuRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
 
-  // Dynamic AI Quota status
+  // Dynamic AI Quota status synchronized with Supabase
   const [quota, setQuota] = useState(() =>
     getAiQuotaStatus(user?.id || "local-user", (profile?.plan_tier as any) || "free")
   );
 
   useEffect(() => {
-    setQuota(getAiQuotaStatus(user?.id || "local-user", (profile?.plan_tier as any) || "free"));
-  }, [user?.id, profile?.plan_tier]);
+    if (profile) {
+      const today = new Date().toISOString().split("T")[0];
+      const usedToday = profile.last_ai_request_date === today ? (profile.daily_ai_requests_count || 0) : 0;
+      const limit = profile.plan_tier === "pro" ? 250 : 25;
+      const remaining = Math.max(0, limit - usedToday);
+      setQuota((prev) => ({
+        ...prev,
+        limit,
+        remaining,
+      }));
+    } else {
+      setQuota(getAiQuotaStatus(user?.id || "local-user", (profile?.plan_tier as any) || "free"));
+    }
+
+    const unsubscribe = subscribeCreditUpdates(({ remaining, limit }) => {
+      setQuota((prev) => ({ ...prev, remaining, limit }));
+    });
+
+    return () => unsubscribe();
+  }, [user?.id, profile]);
 
   // Real System & Account Notifications
   const [notifications, setNotifications] = useState([
