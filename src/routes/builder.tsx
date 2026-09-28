@@ -65,6 +65,7 @@ import type {
 } from "@/lib/ai/types";
 import { generateLatexResumeSource } from "@/lib/latex/latex-generator";
 import { ResumePaperCanvas } from "@/components/builder/resume-paper-canvas";
+import { JobMateEmblem } from "@/components/brand/jobmate-logo";
 import {
   analyzeGitHubRepository,
   type GitHubProjectAnalysis,
@@ -918,15 +919,13 @@ function ResumeBuilderPage() {
             className="flex items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 py-1 text-xs font-semibold text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="size-3.5" />
-            <span>Dashboard</span>
+            <span className="hidden sm:inline">Dashboard</span>
           </Link>
 
           <span className="h-4 w-px bg-border" />
 
           <div className="flex items-center gap-1.5">
-            <span className="grid size-6 place-items-center rounded-md bg-primary text-primary-foreground text-xs font-bold shrink-0">
-              <FileCheck2 className="size-3.5" />
-            </span>
+            <JobMateEmblem size="xs" />
             {isEditingTitle ? (
               <div className="flex items-center gap-1">
                 <input
@@ -954,7 +953,7 @@ function ResumeBuilderPage() {
                 className="group flex items-center gap-1.5 cursor-pointer rounded-md px-1.5 py-0.5 hover:bg-muted/70 transition-colors"
                 title="Click or use pencil to rename resume title"
               >
-                <span className="text-xs font-bold text-foreground truncate max-w-[150px] sm:max-w-[220px] group-hover:text-primary transition-colors">
+                <span className="text-xs font-bold text-foreground truncate max-w-[130px] sm:max-w-[200px] group-hover:text-primary transition-colors">
                   {resumeData.personal.targetRole || "Senior Frontend Engineer"}
                 </span>
                 <button
@@ -975,6 +974,17 @@ function ResumeBuilderPage() {
 
         {/* Action Controls */}
         <div className="flex items-center gap-2">
+          {/* Daily AI Credits Pill */}
+          <Link
+            to="/settings"
+            className="flex items-center gap-1 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-1 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 transition-colors"
+            title="Daily AI Credits remaining"
+          >
+            <Zap className="size-3 fill-indigo-600 dark:fill-indigo-400" />
+            <span className="font-mono text-[11px]">25/25</span>
+            <span className="hidden md:inline text-[10px] text-indigo-500">Credits</span>
+          </Link>
+
           {/* Start Blank / Reset Button */}
           <Button
             variant="ghost"

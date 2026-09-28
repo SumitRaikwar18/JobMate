@@ -1,22 +1,45 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
   <defs>
-    <linearGradient id="jmGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#3b82f6" />
-      <stop offset="100%" stop-color="#1d4ed8" />
+    <linearGradient id="jmBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4F46E5" />
+      <stop offset="50%" stop-color="#4338CA" />
+      <stop offset="100%" stop-color="#6D28D9" />
     </linearGradient>
-    <filter id="jmShadow" x="-10%" y="-10%" width="120%" height="120%" filterUnits="userSpaceOnUse">
-      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#1e40af" flood-opacity="0.3" />
+    <linearGradient id="jmCyan" x1="16" y1="16" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#38BDF8" />
+      <stop offset="1" stop-color="#818CF8" />
+    </linearGradient>
+    <linearGradient id="jmWhite" x1="20" y1="20" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" />
+      <stop offset="1" stop-color="#E0E7FF" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#312E81" flood-opacity="0.4" />
     </filter>
   </defs>
-  <!-- Background Rounded Badge -->
-  <rect x="4" y="4" width="56" height="56" rx="14" fill="url(#jmGradient)" filter="url(#jmShadow)" />
-  
-  <!-- File Document Outline -->
-  <path d="M22 17H38L46 25V47C46 48.6569 44.6569 50 43 50H22C20.3431 50 19 48.6569 19 47V20C19 18.3431 20.3431 17 22 17Z" fill="white" fill-opacity="0.16" stroke="white" stroke-width="2" stroke-linejoin="round" />
-  
-  <!-- Folded Corner -->
-  <path d="M38 17V25H46" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-  
-  <!-- Verified Checkmark in Center -->
-  <path d="M26 34L31 39L40 28" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" />
+
+  <!-- Premium Rounded Squircle Background -->
+  <rect x="4" y="4" width="56" height="56" rx="16" fill="url(#jmBg)" filter="url(#shadow)" />
+  <rect x="4.5" y="4.5" width="55" height="55" rx="15.5" stroke="#FFFFFF" stroke-opacity="0.2" />
+
+  <!-- J Arch -->
+  <path
+    d="M17 18H26V36C26 39.866 22.866 43 19 43C17.3431 43 16 41.6569 16 40V38"
+    stroke="url(#jmCyan)"
+    stroke-width="5"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+
+  <!-- M Trajectory -->
+  <path
+    d="M26 18L36.5 30.5L47 18V43"
+    stroke="url(#jmWhite)"
+    stroke-width="5"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+
+  <!-- AI Target Indicator Sparkle -->
+  <circle cx="47" cy="18" r="3.5" fill="#38BDF8" />
 </svg>

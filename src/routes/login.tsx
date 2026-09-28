@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/use-auth";
+import { JobMateLogo } from "@/components/brand/jobmate-logo";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -231,13 +232,8 @@ function AuthPage() {
 
         {/* Top Logo & Platform Badge */}
         <div className="relative z-10 flex items-center justify-between">
-          <Link to="/" className="inline-flex items-center gap-2.5 text-white" aria-label="JobMate Home">
-            <span className="grid size-9 place-items-center rounded-xl bg-primary text-primary-foreground shadow-button">
-              <FileCheck2 className="size-5" />
-            </span>
-            <span className="text-xl font-bold tracking-tight">
-              Job<span className="text-primary-hover">Mate</span>
-            </span>
+          <Link to="/" className="inline-flex items-center" aria-label="JobMate Home">
+            <JobMateLogo size="md" />
           </Link>
 
           <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-primary-hover backdrop-blur-md">

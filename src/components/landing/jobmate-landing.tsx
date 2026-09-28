@@ -26,18 +26,15 @@ import { useState, type ReactNode } from "react";
 
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-
 import { useAuth } from "@/hooks/use-auth";
+import { JobMateLogo } from "@/components/brand/jobmate-logo";
 
 const telegramUrl = "https://t.me/jobmate_bot";
 
 function Logo({ compact = false }: { compact?: boolean }) {
   return (
-    <Link to="/" className="inline-flex shrink-0 items-center gap-2" aria-label="JobMate home">
-      <span className={cn("grid place-items-center rounded-lg bg-primary text-primary-foreground shadow-button", compact ? "size-8" : "size-9")}>
-        <FileCheck2 className={compact ? "size-4" : "size-5"} />
-      </span>
-      <span className="text-lg font-bold text-foreground">Job<span className="text-primary">Mate</span></span>
+    <Link to="/" className="inline-flex shrink-0 items-center" aria-label="JobMate home">
+      <JobMateLogo size={compact ? "sm" : "md"} />
     </Link>
   );
 }

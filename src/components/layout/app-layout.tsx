@@ -20,16 +20,20 @@ import {
   Search,
   Send,
   Settings,
+  ShieldCheck,
   Sparkles,
   User,
   Wand2,
   X,
+  Zap,
 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { JobMateLogo, JobMateEmblem } from "@/components/brand/jobmate-logo";
+import { getAiQuotaStatus } from "@/lib/ai/rate-limiter";
 
 export interface AppLayoutProps {
   children: ReactNode;
@@ -48,31 +52,56 @@ export function AppLayout({ children, activeNav }: AppLayoutProps) {
   const userMenuRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
 
-  // System notifications
+  // Dynamic AI Quota status
+  const [quota, setQuota] = useState(() =>
+    getAiQuotaStatus(user?.id || "local-user", (profile?.plan_tier as any) || "free")
+  );
+
+  useEffect(() => {
+    setQuota(getAiQuotaStatus(user?.id || "local-user", (profile?.plan_tier as any) || "free"));
+  }, [user?.id, profile?.plan_tier]);
+
+  // Real System & Account Notifications
   const [notifications, setNotifications] = useState([
     {
       id: "1",
-      title: "Multi-Agent DAG Online",
-      description: "5-Agent LangGraph StateGraph engine is ready for JD tailoring.",
+      title: "Daily AI Quota Ready",
+      description: "You have 25 free AI tailoring & ATS audit requests refreshed for today.",
       time: "Just now",
       read: false,
-      type: "ai",
+      type: "quota",
+      icon: Zap,
+      color: "text-amber-500 bg-amber-500/10",
     },
     {
       id: "2",
-      title: "LaTeX ATS Engine Active",
-      description: "Deterministic 1-page single-column LaTeX compiler configured.",
-      time: "2h ago",
+      title: "Overleaf pdflatex Engine Active",
+      description: "1-page single-column ATS LaTeX generation ready with 0 formatting errors.",
+      time: "10m ago",
       read: false,
       type: "latex",
+      icon: FileCode,
+      color: "text-indigo-500 bg-indigo-500/10",
     },
     {
       id: "3",
+      title: "Telegram Career Copilot",
+      description: "Link your Telegram account in Settings (/link) to audit resumes on the go.",
+      time: "1h ago",
+      read: false,
+      type: "bot",
+      icon: Bot,
+      color: "text-sky-500 bg-sky-500/10",
+    },
+    {
+      id: "4",
       title: "Supabase Security Verified",
-      description: "Row Level Security (RLS) active on all 9 candidate tables.",
+      description: "Row Level Security (RLS) active on all candidate profiles and resumes.",
       time: "1d ago",
       read: true,
       type: "security",
+      icon: ShieldCheck,
+      color: "text-emerald-500 bg-emerald-500/10",
     },
   ]);
 
@@ -117,14 +146,9 @@ export function AppLayout({ children, activeNav }: AppLayoutProps) {
       {/* DESKTOP SIDEBAR */}
       <aside className="hidden lg:flex w-60 flex-col justify-between border-r border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 p-4 shrink-0 sticky top-0 h-screen">
         <div className="space-y-6">
-          {/* Logo */}
-          <Link to="/" className="flex items-center gap-2.5 px-2 py-1.5 group">
-            <div className="grid size-9 place-items-center rounded-xl bg-indigo-600 text-white shadow-button transition-transform group-hover:scale-105">
-              <Briefcase className="size-5" />
-            </div>
-            <span className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-              Job<span className="text-indigo-600">Mate</span>
-            </span>
+          {/* YC-Styled Brand Logo */}
+          <Link to="/" className="flex items-center px-1.5 py-1">
+            <JobMateLogo size="md" />
           </Link>
 
           {/* Navigation Items */}
@@ -151,25 +175,40 @@ export function AppLayout({ children, activeNav }: AppLayoutProps) {
           </nav>
         </div>
 
-        {/* Bottom AI Status & Fast Actions */}
-        <div className="space-y-2">
+        {/* Bottom AI Quota Status Widget */}
+        <div className="space-y-2.5">
+          <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/60 p-3 shadow-xs">
+            <div className="flex items-center justify-between text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
+              <span className="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400">
+                <Zap className="size-3.5 fill-indigo-600 dark:fill-indigo-400" />
+                <span>AI Credits</span>
+              </span>
+              <span className="text-[11px] font-mono text-slate-600 dark:text-slate-400">
+                {quota.remaining}/{quota.limit}
+              </span>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="w-full bg-slate-200 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden mb-1.5">
+              <div
+                className="bg-gradient-to-r from-indigo-500 to-violet-600 h-full rounded-full transition-all duration-300"
+                style={{ width: `${Math.min(100, (quota.remaining / quota.limit) * 100)}%` }}
+              />
+            </div>
+
+            <div className="flex items-center justify-between text-[10px] text-slate-400">
+              <span className="capitalize">{profile?.plan_tier || "Free"} Tier</span>
+              <span>Resets {quota.resetAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+            </div>
+          </div>
+
           <Link
             to="/builder"
             className="w-full flex items-center justify-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white p-2.5 text-xs font-bold shadow-button transition-colors"
           >
             <Sparkles className="size-3.5" />
-            <span>Open AI Studio</span>
+            <span>Resume Builder</span>
           </Link>
-
-          <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/50 p-3 text-center">
-            <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-slate-800 dark:text-slate-200">
-              <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Multi-Agent DAG</span>
-            </div>
-            <p className="mt-0.5 text-[10px] text-slate-500">
-              0% Hallucination Guardrail
-            </p>
-          </div>
         </div>
       </aside>
 
@@ -186,13 +225,8 @@ export function AppLayout({ children, activeNav }: AppLayoutProps) {
           <div className="relative w-72 max-w-[80vw] bg-white dark:bg-slate-900 p-5 flex flex-col justify-between shadow-2xl z-10 animate-in slide-in-from-left duration-200">
             <div className="space-y-6">
               <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
-                <Link to="/" onClick={() => setIsMobileDrawerOpen(false)} className="flex items-center gap-2">
-                  <div className="grid size-8 place-items-center rounded-lg bg-indigo-600 text-white shadow-button">
-                    <Briefcase className="size-4" />
-                  </div>
-                  <span className="text-lg font-bold text-slate-900 dark:text-white">
-                    Job<span className="text-indigo-600">Mate</span>
-                  </span>
+                <Link to="/" onClick={() => setIsMobileDrawerOpen(false)}>
+                  <JobMateLogo size="sm" />
                 </Link>
                 <button
                   type="button"
@@ -281,43 +315,75 @@ export function AppLayout({ children, activeNav }: AppLayoutProps) {
           </div>
 
           {/* Right Header Navigation & Actions */}
-          <div className="flex items-center gap-3 ml-auto">
+          <div className="flex items-center gap-2.5 ml-auto">
+            {/* Daily AI Credits Pill */}
+            <Link
+              to="/settings"
+              className="flex items-center gap-1.5 rounded-xl border border-indigo-200/80 dark:border-indigo-800/80 bg-indigo-50/80 dark:bg-indigo-950/50 px-2.5 py-1.5 text-xs font-bold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors shadow-2xs"
+              title={`Daily AI Quota: ${quota.remaining}/${quota.limit} requests remaining. Resets at ${quota.resetAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
+            >
+              <Zap className="size-3.5 fill-indigo-600 dark:fill-indigo-400 text-indigo-600 dark:text-indigo-400" />
+              <span className="font-mono">{quota.remaining}/{quota.limit}</span>
+              <span className="hidden sm:inline font-sans text-[11px] font-semibold text-indigo-600/80 dark:text-indigo-400/80">Credits</span>
+            </Link>
+
             {/* Notification Bell */}
             <div className="relative" ref={notifRef}>
               <button
                 type="button"
                 onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
-                className="relative grid size-9 place-items-center rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 shadow-xs"
+                className="relative grid size-9 place-items-center rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-xs transition-colors"
                 aria-label="Notifications"
               >
                 <Bell className="size-4" />
                 {unreadCount > 0 && (
-                  <span className="absolute top-2 right-2 size-2 rounded-full bg-red-500 ring-2 ring-white dark:ring-slate-900" />
+                  <span className="absolute top-2 right-2 size-2 rounded-full bg-indigo-600 ring-2 ring-white dark:ring-slate-900 animate-pulse" />
                 )}
               </button>
 
               {isNotificationsOpen && (
-                <div className="absolute right-0 mt-2 w-80 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 shadow-xl z-50 animate-in fade-in-50 zoom-in-95">
+                <div className="absolute right-0 mt-2 w-84 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 shadow-xl z-50 animate-in fade-in-50 zoom-in-95">
                   <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
-                    <h4 className="text-xs font-bold text-slate-900 dark:text-white">Notifications</h4>
+                    <div className="flex items-center gap-1.5">
+                      <h4 className="text-xs font-bold text-slate-900 dark:text-white">Activity & Alerts</h4>
+                      {unreadCount > 0 && (
+                        <span className="rounded-full bg-indigo-100 dark:bg-indigo-950 px-1.5 py-0.2 text-[9px] font-bold text-indigo-600 dark:text-indigo-400">
+                          {unreadCount} new
+                        </span>
+                      )}
+                    </div>
                     <button
                       type="button"
                       onClick={() => setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))}
-                      className="text-[10px] text-indigo-600 font-semibold hover:underline"
+                      className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold hover:underline"
                     >
-                      Mark all as read
+                      Mark read
                     </button>
                   </div>
-                  <div className="divide-y divide-slate-100 dark:border-slate-800 max-h-64 overflow-y-auto">
-                    {notifications.map((notif) => (
-                      <div key={notif.id} className="py-2.5 px-1 space-y-0.5">
-                        <div className="flex items-center justify-between">
-                          <p className="text-xs font-bold text-slate-800 dark:text-slate-200">{notif.title}</p>
-                          <span className="text-[9px] text-slate-400">{notif.time}</span>
+                  <div className="divide-y divide-slate-100 dark:divide-slate-800/80 max-h-72 overflow-y-auto mt-1">
+                    {notifications.map((notif) => {
+                      const Icon = notif.icon || Bell;
+                      return (
+                        <div
+                          key={notif.id}
+                          className={cn(
+                            "flex items-start gap-2.5 py-2.5 px-1.5 rounded-xl transition-colors",
+                            notif.read ? "opacity-75" : "bg-indigo-50/40 dark:bg-indigo-950/20"
+                          )}
+                        >
+                          <div className={cn("grid size-7 place-items-center rounded-lg shrink-0 mt-0.5", notif.color || "text-indigo-600 bg-indigo-50")}>
+                            <Icon className="size-3.5" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-1">
+                              <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">{notif.title}</p>
+                              <span className="text-[9px] text-slate-400 shrink-0">{notif.time}</span>
+                            </div>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug mt-0.5">{notif.description}</p>
+                          </div>
                         </div>
-                        <p className="text-[11px] text-slate-500 leading-snug">{notif.description}</p>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -333,7 +399,7 @@ export function AppLayout({ children, activeNav }: AppLayoutProps) {
                   isUserMenuOpen && "border-indigo-600 ring-2 ring-indigo-600/20"
                 )}
               >
-                <div className="grid size-8 place-items-center rounded-full bg-indigo-600 text-xs font-extrabold text-white">
+                <div className="grid size-8 place-items-center rounded-full bg-gradient-to-br from-indigo-600 to-violet-700 text-xs font-extrabold text-white shadow-xs">
                   {userInitials}
                 </div>
                 <div className="hidden sm:flex flex-col text-left">
@@ -348,8 +414,14 @@ export function AppLayout({ children, activeNav }: AppLayoutProps) {
               {isUserMenuOpen && (
                 <div className="absolute right-0 mt-2 w-64 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-1.5 shadow-xl z-50 animate-in fade-in-50 zoom-in-95">
                   <div className="px-3 py-2.5 border-b border-slate-100 dark:border-slate-800 mb-1">
-                    <p className="text-xs font-bold text-slate-900 dark:text-white">{displayName}</p>
+                    <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{displayName}</p>
                     <p className="text-[10px] text-slate-500 truncate">{user?.email}</p>
+                    <div className="mt-1.5 flex items-center justify-between rounded-lg bg-slate-50 dark:bg-slate-950 px-2 py-1 border border-slate-200/60 dark:border-slate-800">
+                      <span className="text-[10px] font-semibold text-slate-600 dark:text-slate-400">Plan</span>
+                      <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase font-mono">
+                        {profile?.plan_tier || "Free"}
+                      </span>
+                    </div>
                   </div>
 
                   <div className="space-y-0.5 text-xs">
@@ -367,7 +439,7 @@ export function AppLayout({ children, activeNav }: AppLayoutProps) {
                       className="w-full flex items-center gap-2 rounded-lg px-2.5 py-2 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200"
                     >
                       <Sparkles className="size-3.5 text-indigo-600" />
-                      <span>Live AI Studio</span>
+                      <span>Resume Builder</span>
                     </Link>
                     <Link
                       to="/settings"
