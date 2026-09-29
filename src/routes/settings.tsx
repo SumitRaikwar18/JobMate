@@ -256,30 +256,30 @@ function SettingsPage() {
           </form>
         </div>
 
-        {/* Telegram Bot Pairing Integration */}
+        {/* Evidence Grounding & Provenance Configuration */}
         <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 p-6 shadow-sm space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
             <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <Send className="size-4 text-indigo-600" />
-              Telegram AI Career Assistant Sync
+              <ShieldCheck className="size-4 text-indigo-600" />
+              Evidence Grounding & Verification Configuration
             </h2>
             <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950 px-2 py-0.5 rounded-full">
               <Sparkles className="size-3" />
-              2-Way Sync Active
+              Strict Grounding Mode
             </span>
           </div>
 
           <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-            Link your Telegram account to upload PDF/LaTeX resumes on the go, receive instant ATS audit scores, and draft cover letters directly from your phone.
+            JobMate strictly validates all generated resume bullets and metrics against your ground-truth candidate evidence and GitHub projects. Unsupported claims are rejected automatically.
           </p>
 
           <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
-                Pairing Command
+                Candidate Evidence Scoping
               </p>
               <p className="text-xs font-mono text-indigo-600 dark:text-indigo-400 mt-0.5 font-bold">
-                {telegramPairingCode}
+                {user?.id ? `candidate:${user.id.substring(0, 12)}...` : "candidate:local"}
               </p>
             </div>
 
@@ -287,21 +287,11 @@ function SettingsPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={handleCopyPairingCode}
                 className="gap-1.5 text-xs"
               >
-                {copiedCode ? <Check className="size-3.5 text-emerald-600" /> : <Copy className="size-3.5" />}
-                {copiedCode ? "Copied" : "Copy Command"}
+                <Shield className="size-3.5 text-indigo-600" />
+                Evidence Scope Active
               </Button>
-              <a
-                href="https://t.me/JobMate_Agent_Bot"
-                target="_blank"
-                rel="noreferrer"
-                className={cn(buttonVariants({ variant: "default", size: "sm" }), "gap-1.5 bg-[#229ED9] hover:bg-[#1e8cc0] text-white text-xs")}
-              >
-                <Send className="size-3.5" />
-                Open Telegram Bot
-              </a>
             </div>
           </div>
         </div>

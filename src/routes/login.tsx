@@ -255,18 +255,18 @@ function AuthPage() {
             {[
               {
                 icon: ShieldCheck,
-                title: "ATS Optimization Engine",
-                desc: "Machine-readable formats structured to pass screening filters accurately.",
+                title: "Evidence Grounding Engine",
+                desc: "Every generated resume claim is strictly verified against candidate source evidence.",
               },
               {
                 icon: Bot,
-                title: "Web & Telegram Sync",
-                desc: "Work on desktop or generate and tailor resumes on mobile via Telegram.",
+                title: "GitHub Code Intelligence",
+                desc: "Analyzes repositories, frameworks, and architecture to extract verifiable engineering evidence.",
               },
               {
                 icon: Zap,
-                title: "1-Click Job Description Matching",
-                desc: "Extract essential keywords and generate high-impact achievements instantly.",
+                title: "Deterministic ATS Analysis",
+                desc: "Inspects keyword coverage, formatting, and heuristic scoring with explainable rationale.",
               },
             ].map(({ icon: Icon, title, desc }) => (
               <div
@@ -393,23 +393,6 @@ function AuthPage() {
                   />
                 </svg>
                 <span>Google</span>
-              </button>
-              <span className="absolute -top-2 right-2 rounded-full bg-slate-200 px-1.5 py-0.5 text-[9px] font-bold text-slate-600 shadow-xs dark:bg-slate-800 dark:text-slate-300">
-                Soon
-              </span>
-            </div>
-
-            <div className="relative group">
-              <button
-                type="button"
-                disabled
-                className="w-full opacity-60 cursor-not-allowed flex items-center justify-center gap-2 rounded-xl border border-border/80 bg-background px-4 py-2.5 text-xs font-semibold text-foreground shadow-xs"
-                title="Telegram Bot login coming soon"
-              >
-                <span className="grid size-4 shrink-0 place-items-center rounded-full bg-[#229ED9] text-white">
-                  <Send className="size-2.5" />
-                </span>
-                <span>Telegram Bot</span>
               </button>
               <span className="absolute -top-2 right-2 rounded-full bg-slate-200 px-1.5 py-0.5 text-[9px] font-bold text-slate-600 shadow-xs dark:bg-slate-800 dark:text-slate-300">
                 Soon

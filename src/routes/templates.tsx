@@ -154,66 +154,70 @@ function TemplatesPage() {
 
   // Sample data for generating realistic preview
   const sampleCandidate = {
-    full_name: "Alex Mercer",
+    name: "Alex Mercer",
     email: "alex.mercer@example.com",
     phone: "+1 (555) 234-5678",
-    github_url: "https://github.com/alexmercer",
-    linkedin_url: "https://linkedin.com/in/alexmercer",
-    portfolio_url: "https://alexmercer.dev",
+    github: "https://github.com/alexmercer",
+    linkedin: "https://linkedin.com/in/alexmercer",
+    portfolio: "https://alexmercer.dev",
   };
 
   const sampleExperiences = [
     {
+      id: "exp-1",
       company: "Stripe",
       role: "Senior Software Engineer — Infrastructure",
       location: "San Francisco, CA",
-      start_date: "2022-03",
-      end_date: "Present",
-      is_current: true,
+      startDate: "2022-03",
+      endDate: "Present",
+      current: true,
       bullets: [
-        "Architected and deployed distributed event pipeline processing 140M+ daily transactions with 99.999% uptime using Go and Kafka.",
-        "Reduced p99 API latency from 180ms to 42ms by implementing intelligent Redis multi-tier caching and database connection pooling.",
-        "Mentored 6 junior engineers and standardized CI/CD pipelines, cutting build failure rates by 34% across 18 microservices.",
+        "Architected and deployed distributed event pipeline using Go and Kafka.",
+        "Optimized API latency by implementing Redis multi-tier caching and connection pooling.",
+        "Mentored team members and standardized automated CI/CD pipelines across core services.",
       ],
     },
     {
+      id: "exp-2",
       company: "Datadog",
       role: "Software Engineer",
       location: "New York, NY",
-      start_date: "2020-01",
-      end_date: "2022-02",
-      is_current: false,
+      startDate: "2020-01",
+      endDate: "2022-02",
+      current: false,
       bullets: [
-        "Developed custom telemetry collector in Rust and TypeScript, ingested by over 4,500 enterprise customer nodes.",
-        "Built automated anomaly detection service that cut mean time to detection (MTTD) by 45% during critical outages.",
+        "Developed telemetry collector in Rust and TypeScript for customer telemetry nodes.",
+        "Built automated anomaly detection service for proactive outage mitigations.",
       ],
     },
   ];
 
   const sampleEducation = [
     {
-      school: "University of California, Berkeley",
+      id: "edu-1",
+      institution: "University of California, Berkeley",
       degree: "B.S. in Computer Science",
       location: "Berkeley, CA",
-      graduation_year: "2019",
-      gpa: "3.85 / 4.0",
+      endDate: "2019",
+      score: "GPA: 3.85 / 4.0",
     },
   ];
 
   const sampleSkills = {
-    languages: "Go, TypeScript, Python, Rust, SQL, Bash",
-    frameworks: "React, Next.js, Node.js, FastAPI, LangGraph, PyTorch",
-    cloud: "AWS (ECS, Lambda, S3, RDS), Docker, Kubernetes, Terraform, Kafka",
-    databases: "PostgreSQL, Redis, ClickHouse, Pinecone",
+    languages: ["Go", "TypeScript", "Python", "Rust", "SQL", "Bash"],
+    frameworks: ["React", "Next.js", "Node.js", "FastAPI", "PyTorch"],
+    tools: ["Docker", "Kubernetes", "AWS", "Git", "PostgreSQL", "Redis"],
+    softSkills: ["Technical Leadership", "System Architecture", "Code Review"],
   };
 
   const sampleProjects = [
     {
-      name: "VectorFlow — Real-Time RAG Orchestrator",
-      technologies: "Python, FastAPI, Qdrant, LangChain",
+      id: "proj-1",
+      name: "VectorFlow — Real-Time Retrieval Engine",
+      technologies: "Python, FastAPI, pgvector, TypeScript",
       link: "https://github.com/alexmercer/vectorflow",
       bullets: [
-        "Created hybrid dense-sparse vector search engine achieving 94% Top-5 recall across 500k technical documentation nodes.",
+        "Engineered hybrid vector retrieval engine with semantic embeddings and structured metadata filters.",
       ],
     },
   ];
@@ -221,7 +225,7 @@ function TemplatesPage() {
   const handleOpenPreview = (template: TemplateSpec) => {
     setSelectedTemplate(template);
     const latex = generateLatexResumeSource({
-      profile: sampleCandidate,
+      personal: sampleCandidate,
       experiences: sampleExperiences,
       education: sampleEducation,
       skills: sampleSkills,
@@ -275,13 +279,13 @@ function TemplatesPage() {
                 ATS-Proof Resume Templates
               </h1>
               <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                Every template is compiled with single-column geometry, standard system fonts, and semantic AST tags to score 98%+ on Workday, Taleo, Greenhouse, and Lever.
+                Every template is compiled with single-column geometry, standard system fonts, and semantic AST tags to score high on ATS compatibility tests.
               </p>
             </div>
             <div className="flex items-center gap-3 shrink-0 self-start sm:self-center">
               <Link
                 to="/builder"
-                className={cn(buttonVariants({ variant: "default" }), "gap-2 shadow-button bg-indigo-600 hover:bg-indigo-700 text-white whitespace-nowrap text-xs font-bold px-4 py-2 rounded-xl")}
+                className={cn(buttonVariants({ variant: "primary" }), "gap-2 shadow-button bg-indigo-600 hover:bg-indigo-700 text-white whitespace-nowrap text-xs font-bold px-4 py-2 rounded-xl")}
               >
                 <span>Open Resume Builder</span>
                 <ArrowRight className="size-4" />

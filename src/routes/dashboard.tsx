@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import {
   ArrowRight,
+  BarChart3,
   Bot,
   Briefcase,
   Check,
@@ -21,6 +22,7 @@ import {
   Plus,
   RefreshCw,
   Send,
+  ShieldCheck,
   Sparkles,
   Target,
   Trash2,
@@ -267,14 +269,14 @@ function DashboardPage() {
 
   // Export LaTeX Source for Resume
   const handleExportLatex = (resume: Resume) => {
-    const resumeContent = resume.content || {};
+    const resumeContent = resume.resume_data || {};
     const latex = generateLatexResumeSource({
-      profile: {
-        full_name: profile?.full_name || user?.user_metadata?.full_name || "Candidate",
+      personal: {
+        name: profile?.full_name || (user?.user_metadata?.["full_name"] as string) || "Candidate",
         email: user?.email || "candidate@example.com",
         phone: profile?.phone || "+1 (555) 000-0000",
-        github_url: profile?.github_url,
-        linkedin_url: profile?.linkedin_url,
+        github: profile?.github_url || undefined,
+        linkedin: profile?.linkedin_url || undefined,
       },
       experiences: resumeContent.experiences || [],
       education: resumeContent.education || [],
@@ -307,7 +309,7 @@ function DashboardPage() {
     }
   };
 
-  const displayName = profile?.full_name || user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Candidate";
+  const displayName = profile?.full_name || (user?.user_metadata?.["full_name"] as string) || user?.email?.split("@")[0] || "Candidate";
 
   return (
     <AppLayout activeNav="dashboard">
@@ -386,15 +388,15 @@ function DashboardPage() {
               </div>
             </div>
 
-            {/* Telegram Status */}
+            {/* Evidence Guardrail Status */}
             <div className="rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-4">
               <div className="flex items-center justify-between">
-                <p className="text-xs font-medium text-slate-500">Telegram Bot</p>
-                <Bot className="size-4 text-emerald-600" />
+                <p className="text-xs font-medium text-slate-500">Evidence Guardrail</p>
+                <ShieldCheck className="size-4 text-indigo-600" />
               </div>
               <div className="mt-2 flex items-baseline gap-2">
                 <span className="text-sm font-bold text-slate-900 dark:text-white">
-                  {profile?.telegram_handle ? `@${profile.telegram_handle}` : "Ready to Pair"}
+                  Strict Grounding
                 </span>
                 <span className="size-2 rounded-full bg-emerald-500 animate-pulse ml-auto" />
               </div>

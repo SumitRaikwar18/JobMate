@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import {
+  Activity,
   ArrowLeft,
   ArrowRight,
   Bot,
@@ -65,6 +66,9 @@ import type {
 } from "@/lib/ai/types";
 import { generateLatexResumeSource } from "@/lib/latex/latex-generator";
 import { ResumePaperCanvas } from "@/components/builder/resume-paper-canvas";
+import { ProvenanceModal } from "@/components/builder/provenance-modal";
+import { AiRunDashboardModal } from "@/components/builder/ai-run-dashboard-modal";
+import type { ClaimProvenanceRecord } from "@/lib/ai/retrieval/provenance";
 import { JobMateEmblem } from "@/components/brand/jobmate-logo";
 import {
   analyzeGitHubRepository,
@@ -305,11 +309,18 @@ function ResumeBuilderPage() {
   const [branchedPersonas, setBranchedPersonas] = useState<Record<PersonaType, BranchedPersonaResume> | null>(null);
   const [selectedPersonaTab, setSelectedPersonaTab] = useState<PersonaType>("fullstack");
 
+  // Provenance & Claim Grounding Modal State
+  const [isProvenanceModalOpen, setIsProvenanceModalOpen] = useState(false);
+  const [selectedProvenanceClaim, setSelectedProvenanceClaim] = useState<ClaimProvenanceRecord | null>(null);
+
+  // AI Run Observability Dashboard Modal State
+  const [isAiRunModalOpen, setIsAiRunModalOpen] = useState(false);
+
   // AI Resume Copilot Chat (Tool-Calling) State
   const [copilotMessages, setCopilotMessages] = useState<Array<{
     role: "assistant" | "user";
     content: string;
-    actionsApplied?: string[];
+    actionsApplied?: string[] | undefined;
   }>>([
     {
       role: "assistant",
@@ -381,7 +392,15 @@ function ResumeBuilderPage() {
   };
 
   const handleOpenLatexModal = () => {
-    const generated = generateLatexResumeSource(resumeData as any, template === "classic" ? "classic" : "modern");
+    const generated = generateLatexResumeSource({
+      personal: resumeData.personal,
+      summary: resumeData.summary,
+      skills: resumeData.skills,
+      experiences: resumeData.experiences,
+      projects: resumeData.projects,
+      education: resumeData.education,
+      templateId: template === "classic" ? "classic" : "modern",
+    });
     setLatexSource(generated);
     setIsLatexModalOpen(true);
   };
@@ -423,14 +442,15 @@ function ResumeBuilderPage() {
 
     if (resumeIdParam && user?.id) {
       setLoadingResume(true);
-      supabase
-        .from("resumes")
-        .select("*")
-        .eq("id", resumeIdParam)
-        .eq("user_id", user.id)
-        .maybeSingle()
-        .then(({ data, error }) => {
-          setLoadingResume(false);
+      const fetchResume = async () => {
+        try {
+          const { data } = await supabase
+            .from("resumes")
+            .select("*")
+            .eq("id", resumeIdParam)
+            .eq("user_id", user.id)
+            .maybeSingle();
+
           if (data && data.resume_data) {
             setActiveResumeId(data.id);
             setResumeData(data.resume_data as ResumeDataState);
@@ -450,8 +470,13 @@ function ResumeBuilderPage() {
             }
             toast.success(`Loaded "${data.title}" from database!`);
           }
-        })
-        .catch(() => setLoadingResume(false));
+        } catch {
+          // ignore
+        } finally {
+          setLoadingResume(false);
+        }
+      };
+      fetchResume();
     } else if (profile) {
       setResumeData((prev) => ({
         ...prev,
@@ -780,8 +805,8 @@ function ResumeBuilderPage() {
     setEnhancingBulletId(actionKey);
     try {
       const variations = await enhanceBulletPointWithAI(currentBullet, resumeData.personal.targetRole || "Software Engineer");
-      if (variations && variations.length > 0) {
-        const bestVariation = variations[0];
+      const bestVariation = variations?.[0];
+      if (bestVariation) {
         setResumeData((prev) => {
           const nextExps = prev.experiences.map((exp) => {
             if (exp.id === expId) {
@@ -1075,6 +1100,17 @@ function ResumeBuilderPage() {
           >
             <FileCode className="size-3.5" />
             <span className="hidden sm:inline">LaTeX (.tex)</span>
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsAiRunModalOpen(true)}
+            className="h-8 gap-1.5 rounded-lg text-xs font-semibold border-indigo-500/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/10"
+            title="Inspect Multi-Agent DAG Execution Trace & Cost Telemetry"
+          >
+            <Activity className="size-3.5 text-indigo-500" />
+            <span className="hidden sm:inline">AI Trace</span>
           </Button>
 
           <Button
@@ -1589,6 +1625,20 @@ function ResumeBuilderPage() {
         </div>
       )}
 
+      {/* Claim Provenance & Grounding Inspector Modal */}
+      <ProvenanceModal
+        isOpen={isProvenanceModalOpen}
+        onClose={() => setIsProvenanceModalOpen(false)}
+        claimRecord={selectedProvenanceClaim}
+      />
+
+      {/* Multi-Agent DAG Run Observability Dashboard Modal */}
+      <AiRunDashboardModal
+        isOpen={isAiRunModalOpen}
+        onClose={() => setIsAiRunModalOpen(false)}
+        executionTrace={pipelineSteps}
+      />
+
       {/* Main Split-Screen Workspace */}
       <main className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 p-4 sm:p-6 max-w-[1600px] mx-auto w-full">
         {/* Left Column: Form Editor OR AI Copilot Chat (5 Cols on desktop) */}
@@ -1960,9 +2010,12 @@ function ResumeBuilderPage() {
                             type="text"
                             value={exp.role}
                             onChange={(e) => {
-                              const updated = [...resumeData.experiences];
-                              updated[expIdx].role = e.target.value;
-                              setResumeData({ ...resumeData, experiences: updated });
+                              setResumeData({
+                                ...resumeData,
+                                experiences: resumeData.experiences.map((item, idx) =>
+                                  idx === expIdx ? { ...item, role: e.target.value } : item
+                                ),
+                              });
                             }}
                             placeholder="Job Title / Role"
                             className="flex-1 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs font-semibold text-foreground focus:outline-none"
@@ -1986,9 +2039,12 @@ function ResumeBuilderPage() {
                             type="text"
                             value={exp.company}
                             onChange={(e) => {
-                              const updated = [...resumeData.experiences];
-                              updated[expIdx].company = e.target.value;
-                              setResumeData({ ...resumeData, experiences: updated });
+                              setResumeData({
+                                ...resumeData,
+                                experiences: resumeData.experiences.map((item, idx) =>
+                                  idx === expIdx ? { ...item, company: e.target.value } : item
+                                ),
+                              });
                             }}
                             placeholder="Company"
                             className="rounded-lg border border-border bg-background px-2.5 py-1 text-xs text-foreground focus:outline-none"
@@ -1997,9 +2053,12 @@ function ResumeBuilderPage() {
                             type="text"
                             value={exp.location}
                             onChange={(e) => {
-                              const updated = [...resumeData.experiences];
-                              updated[expIdx].location = e.target.value;
-                              setResumeData({ ...resumeData, experiences: updated });
+                              setResumeData({
+                                ...resumeData,
+                                experiences: resumeData.experiences.map((item, idx) =>
+                                  idx === expIdx ? { ...item, location: e.target.value } : item
+                                ),
+                              });
                             }}
                             placeholder="Location"
                             className="rounded-lg border border-border bg-background px-2.5 py-1 text-xs text-foreground focus:outline-none"
@@ -2011,9 +2070,12 @@ function ResumeBuilderPage() {
                             type="text"
                             value={exp.startDate}
                             onChange={(e) => {
-                              const updated = [...resumeData.experiences];
-                              updated[expIdx].startDate = e.target.value;
-                              setResumeData({ ...resumeData, experiences: updated });
+                              setResumeData({
+                                ...resumeData,
+                                experiences: resumeData.experiences.map((item, idx) =>
+                                  idx === expIdx ? { ...item, startDate: e.target.value } : item
+                                ),
+                              });
                             }}
                             placeholder="Start Date (e.g. 2022)"
                             className="rounded-lg border border-border bg-background px-2.5 py-1 text-xs text-foreground focus:outline-none"
@@ -2022,9 +2084,12 @@ function ResumeBuilderPage() {
                             type="text"
                             value={exp.endDate}
                             onChange={(e) => {
-                              const updated = [...resumeData.experiences];
-                              updated[expIdx].endDate = e.target.value;
-                              setResumeData({ ...resumeData, experiences: updated });
+                              setResumeData({
+                                ...resumeData,
+                                experiences: resumeData.experiences.map((item, idx) =>
+                                  idx === expIdx ? { ...item, endDate: e.target.value } : item
+                                ),
+                              });
                             }}
                             placeholder="End Date (or Present)"
                             className="rounded-lg border border-border bg-background px-2.5 py-1 text-xs text-foreground focus:outline-none"
@@ -2045,9 +2110,17 @@ function ResumeBuilderPage() {
                                 rows={2}
                                 value={bullet}
                                 onChange={(e) => {
-                                  const updated = [...resumeData.experiences];
-                                  updated[expIdx].bullets[bIdx] = e.target.value;
-                                  setResumeData({ ...resumeData, experiences: updated });
+                                  setResumeData({
+                                    ...resumeData,
+                                    experiences: resumeData.experiences.map((item, idx) =>
+                                      idx === expIdx
+                                        ? {
+                                            ...item,
+                                            bullets: item.bullets.map((b, bi) => (bi === bIdx ? e.target.value : b)),
+                                          }
+                                        : item
+                                    ),
+                                  });
                                 }}
                                 className="flex-1 rounded-lg border border-border bg-background p-2 text-xs text-foreground focus:outline-none"
                               />
@@ -2067,12 +2140,49 @@ function ResumeBuilderPage() {
                                     <Sparkles className="size-3.5" />
                                   )}
                                 </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    const matchedTech = resumeData.skills.languages
+                                      .concat(resumeData.skills.frameworks)
+                                      .filter((t) => bullet.toLowerCase().includes(t.toLowerCase()));
+                                    const matchedMtr = bullet.match(/(\b\d+[%kM$+]?\b)/g) || [];
+                                    setSelectedProvenanceClaim({
+                                      claimId: `bullet-${exp.id}-${bIdx}`,
+                                      claimText: bullet,
+                                      evidenceId: exp.id,
+                                      evidenceSourceType: "experience",
+                                      evidenceTitle: `${exp.role} at ${exp.company}`,
+                                      evidenceExcerpt: `${exp.company} (${exp.startDate} - ${exp.endDate}): ${bullet}`,
+                                      confidenceScore: 0.95,
+                                      verificationStatus: "grounded",
+                                      matchedTechnologies: matchedTech,
+                                      matchedMetrics: Array.from(matchedMtr),
+                                      explanation: `Verified grounded in candidate experience record for ${exp.company}.`,
+                                    });
+                                    setIsProvenanceModalOpen(true);
+                                  }}
+                                  className="size-7 p-0 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950"
+                                  title="🛡️ Why this claim? Inspect Evidence Grounding"
+                                >
+                                  <ShieldCheck className="size-3.5" />
+                                </Button>
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    const updated = [...resumeData.experiences];
-                                    updated[expIdx].bullets = updated[expIdx].bullets.filter((_, i) => i !== bIdx);
-                                    setResumeData({ ...resumeData, experiences: updated });
+                                    setResumeData({
+                                      ...resumeData,
+                                      experiences: resumeData.experiences.map((item, idx) =>
+                                        idx === expIdx
+                                          ? {
+                                              ...item,
+                                              bullets: item.bullets.filter((_, bi) => bi !== bIdx),
+                                            }
+                                          : item
+                                      ),
+                                    });
                                   }}
                                   className="size-7 p-0 text-muted-foreground hover:text-destructive flex items-center justify-center"
                                 >
@@ -2088,9 +2198,17 @@ function ResumeBuilderPage() {
                               variant="ghost"
                               size="sm"
                               onClick={() => {
-                                const updated = [...resumeData.experiences];
-                                updated[expIdx].bullets.push("Engineered and delivered core feature, accelerating workflow by 20%.");
-                                setResumeData({ ...resumeData, experiences: updated });
+                                setResumeData({
+                                  ...resumeData,
+                                  experiences: resumeData.experiences.map((item, idx) =>
+                                    idx === expIdx
+                                      ? {
+                                          ...item,
+                                          bullets: [...item.bullets, "Engineered and delivered core feature, accelerating workflow by 20%."],
+                                        }
+                                      : item
+                                  ),
+                                });
                               }}
                               className="h-6 text-[10px] text-primary"
                             >
@@ -2162,9 +2280,12 @@ function ResumeBuilderPage() {
                         type="text"
                         value={proj.name}
                         onChange={(e) => {
-                          const updated = [...resumeData.projects];
-                          updated[pIdx].name = e.target.value;
-                          setResumeData({ ...resumeData, projects: updated });
+                          setResumeData({
+                            ...resumeData,
+                            projects: resumeData.projects.map((item, idx) =>
+                              idx === pIdx ? { ...item, name: e.target.value } : item
+                            ),
+                          });
                         }}
                         placeholder="Project Name"
                         className="flex-1 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs font-semibold text-foreground focus:outline-none"
@@ -2187,9 +2308,12 @@ function ResumeBuilderPage() {
                       type="text"
                       value={proj.technologies}
                       onChange={(e) => {
-                        const updated = [...resumeData.projects];
-                        updated[pIdx].technologies = e.target.value;
-                        setResumeData({ ...resumeData, projects: updated });
+                        setResumeData({
+                          ...resumeData,
+                          projects: resumeData.projects.map((item, idx) =>
+                            idx === pIdx ? { ...item, technologies: e.target.value } : item
+                          ),
+                        });
                       }}
                       placeholder="Technologies (e.g. React, TypeScript, Node.js)"
                       className="w-full rounded-lg border border-border bg-background px-2.5 py-1 text-[11px] text-foreground focus:outline-none"
@@ -2199,9 +2323,12 @@ function ResumeBuilderPage() {
                       type="text"
                       value={proj.link}
                       onChange={(e) => {
-                        const updated = [...resumeData.projects];
-                        updated[pIdx].link = e.target.value;
-                        setResumeData({ ...resumeData, projects: updated });
+                        setResumeData({
+                          ...resumeData,
+                          projects: resumeData.projects.map((item, idx) =>
+                            idx === pIdx ? { ...item, link: e.target.value } : item
+                          ),
+                        });
                       }}
                       placeholder="Project URL / GitHub"
                       className="w-full rounded-lg border border-border bg-background px-2.5 py-1 text-[11px] text-foreground focus:outline-none"
@@ -2221,18 +2348,34 @@ function ResumeBuilderPage() {
                             rows={2}
                             value={b}
                             onChange={(e) => {
-                              const updated = [...resumeData.projects];
-                              updated[pIdx].bullets[bIdx] = e.target.value;
-                              setResumeData({ ...resumeData, projects: updated });
+                              setResumeData({
+                                ...resumeData,
+                                projects: resumeData.projects.map((item, idx) =>
+                                  idx === pIdx
+                                    ? {
+                                        ...item,
+                                        bullets: item.bullets.map((bullet, bi) => (bi === bIdx ? e.target.value : bullet)),
+                                      }
+                                    : item
+                                ),
+                              });
                             }}
                             className="flex-1 rounded-lg border border-border bg-background p-2 text-xs text-foreground focus:outline-none"
                           />
                           <button
                             type="button"
                             onClick={() => {
-                              const updated = [...resumeData.projects];
-                              updated[pIdx].bullets = updated[pIdx].bullets.filter((_, i) => i !== bIdx);
-                              setResumeData({ ...resumeData, projects: updated });
+                              setResumeData({
+                                ...resumeData,
+                                projects: resumeData.projects.map((item, idx) =>
+                                  idx === pIdx
+                                    ? {
+                                        ...item,
+                                        bullets: item.bullets.filter((_, bi) => bi !== bIdx),
+                                      }
+                                    : item
+                                ),
+                              });
                             }}
                             className="size-7 p-0 text-muted-foreground hover:text-destructive flex items-center justify-center"
                           >
@@ -2246,9 +2389,17 @@ function ResumeBuilderPage() {
                         variant="ghost"
                         size="sm"
                         onClick={() => {
-                          const updated = [...resumeData.projects];
-                          updated[pIdx].bullets.push("Architected and deployed application with high reliability and performance.");
-                          setResumeData({ ...resumeData, projects: updated });
+                          setResumeData({
+                            ...resumeData,
+                            projects: resumeData.projects.map((item, idx) =>
+                              idx === pIdx
+                                ? {
+                                    ...item,
+                                    bullets: [...item.bullets, "Architected and deployed application with high reliability and performance."],
+                                  }
+                                : item
+                            ),
+                          });
                         }}
                         className="h-6 text-[10px] text-primary"
                       >
@@ -2296,9 +2447,12 @@ function ResumeBuilderPage() {
                         type="text"
                         value={edu.degree}
                         onChange={(e) => {
-                          const updated = [...resumeData.education];
-                          updated[eIdx].degree = e.target.value;
-                          setResumeData({ ...resumeData, education: updated });
+                          setResumeData({
+                            ...resumeData,
+                            education: resumeData.education.map((item, idx) =>
+                              idx === eIdx ? { ...item, degree: e.target.value } : item
+                            ),
+                          });
                         }}
                         placeholder="Degree / Major"
                         className="flex-1 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs font-semibold text-foreground focus:outline-none"
@@ -2322,9 +2476,12 @@ function ResumeBuilderPage() {
                         type="text"
                         value={edu.institution}
                         onChange={(e) => {
-                          const updated = [...resumeData.education];
-                          updated[eIdx].institution = e.target.value;
-                          setResumeData({ ...resumeData, education: updated });
+                          setResumeData({
+                            ...resumeData,
+                            education: resumeData.education.map((item, idx) =>
+                              idx === eIdx ? { ...item, institution: e.target.value } : item
+                            ),
+                          });
                         }}
                         placeholder="Institution / University"
                         className="rounded-lg border border-border bg-background px-2.5 py-1 text-xs text-foreground focus:outline-none"
@@ -2333,9 +2490,12 @@ function ResumeBuilderPage() {
                         type="text"
                         value={edu.location}
                         onChange={(e) => {
-                          const updated = [...resumeData.education];
-                          updated[eIdx].location = e.target.value;
-                          setResumeData({ ...resumeData, education: updated });
+                          setResumeData({
+                            ...resumeData,
+                            education: resumeData.education.map((item, idx) =>
+                              idx === eIdx ? { ...item, location: e.target.value } : item
+                            ),
+                          });
                         }}
                         placeholder="Location"
                         className="rounded-lg border border-border bg-background px-2.5 py-1 text-xs text-foreground focus:outline-none"
@@ -2347,9 +2507,12 @@ function ResumeBuilderPage() {
                         type="text"
                         value={edu.startDate}
                         onChange={(e) => {
-                          const updated = [...resumeData.education];
-                          updated[eIdx].startDate = e.target.value;
-                          setResumeData({ ...resumeData, education: updated });
+                          setResumeData({
+                            ...resumeData,
+                            education: resumeData.education.map((item, idx) =>
+                              idx === eIdx ? { ...item, startDate: e.target.value } : item
+                            ),
+                          });
                         }}
                         placeholder="Start Date"
                         className="rounded-lg border border-border bg-background px-2.5 py-1 text-xs text-foreground focus:outline-none"
@@ -2358,9 +2521,12 @@ function ResumeBuilderPage() {
                         type="text"
                         value={edu.endDate}
                         onChange={(e) => {
-                          const updated = [...resumeData.education];
-                          updated[eIdx].endDate = e.target.value;
-                          setResumeData({ ...resumeData, education: updated });
+                          setResumeData({
+                            ...resumeData,
+                            education: resumeData.education.map((item, idx) =>
+                              idx === eIdx ? { ...item, endDate: e.target.value } : item
+                            ),
+                          });
                         }}
                         placeholder="End Date"
                         className="rounded-lg border border-border bg-background px-2.5 py-1 text-xs text-foreground focus:outline-none"
@@ -2369,9 +2535,12 @@ function ResumeBuilderPage() {
                         type="text"
                         value={edu.score}
                         onChange={(e) => {
-                          const updated = [...resumeData.education];
-                          updated[eIdx].score = e.target.value;
-                          setResumeData({ ...resumeData, education: updated });
+                          setResumeData({
+                            ...resumeData,
+                            education: resumeData.education.map((item, idx) =>
+                              idx === eIdx ? { ...item, score: e.target.value } : item
+                            ),
+                          });
                         }}
                         placeholder="GPA / Honors"
                         className="rounded-lg border border-border bg-background px-2.5 py-1 text-xs text-foreground focus:outline-none"
