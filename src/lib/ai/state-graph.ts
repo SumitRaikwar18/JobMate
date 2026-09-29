@@ -12,76 +12,103 @@ import { runPlannerAgent } from "./agents/planner-agent";
 import { runSynthesizerAgent } from "./agents/synthesizer-agent";
 import { runCriticGuardrailAgent } from "./agents/critic-guardrail-agent";
 import { runAtsAuditorAgent } from "./agents/ats-auditor-agent";
-import { retrieveAndRankCandidateEvidence, type RankedEvidenceItem } from "./rag-retriever";
+import { retrieveHybridCandidateEvidence, type HybridRetrievedItem } from "./retrieval/hybrid-retriever";
+import { rerankRetrievedEvidence, type RerankedItem } from "./retrieval/reranker";
+import { buildClaimProvenanceRecords, type ClaimProvenanceRecord } from "./retrieval/provenance";
+import { PROMPT_REGISTRY } from "./prompts/registry";
+import { calculateEstimatedCostUsd, estimateTokenCount } from "./model-router";
+import type { EvidenceItem } from "./schemas/evidence-schema";
+import { supabase } from "@/lib/supabase";
 
 /**
- * LangGraph State Channels Schema
+ * State Channels Schema for Resume Pipeline Execution Graph
  */
 export interface ResumeStateGraphChannels {
+  runId: string;
   candidateId: string;
   evidenceBank: CandidateEvidenceBank;
   rawJdText: string;
-  targetCompany?: string;
+  targetCompany?: string | undefined;
 
   // Graph Channels
-  jobAnalysis?: JobAnalysisResult;
-  rankedEvidence: RankedEvidenceItem[];
-  resumePlan?: ResumePlan;
+  jobAnalysis?: JobAnalysisResult | undefined;
+  retrievedEvidence: HybridRetrievedItem[];
+  rerankedEvidence: RerankedItem[];
+  resumePlan?: ResumePlan | undefined;
   currentDraft?: any;
+  provenanceRecords: ClaimProvenanceRecord[];
 
   // Reflection & Verification Channel
   reflectionCount: number;
   maxReflections: number;
-  guardrailReport?: GuardrailValidationReport;
-  criticFeedback?: string;
+  guardrailReport?: GuardrailValidationReport | undefined;
+  criticFeedback?: string | undefined;
 
   // Evaluation & Trace Channel
-  atsAudit?: AtsSimulationAudit;
+  atsAudit?: AtsSimulationAudit | undefined;
   executionTrace: AgentExecutionStep[];
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  estimatedCostUsd: number;
   status: "idle" | "running" | "reflecting" | "completed" | "failed";
 }
 
 export type StateGraphStepCallback = (step: AgentExecutionStep) => void;
 
 /**
- * LangGraph-Style StateGraph Runner with Conditional Reflection Edges
+ * StateGraph Runner with Persistent AI Execution Tracing, Hybrid RAG, Reranking & Claim Provenance
  */
 export class ResumeStateGraph {
   private state: ResumeStateGraphChannels;
-  private onStepCallback?: StateGraphStepCallback;
+  private onStepCallback?: StateGraphStepCallback | undefined;
+  private startTime = 0;
 
   constructor(
     rawJdText: string,
     evidenceBank: CandidateEvidenceBank,
-    targetCompany?: string,
-    onStepUpdate?: StateGraphStepCallback
+    targetCompany?: string | undefined,
+    onStepUpdate?: StateGraphStepCallback | undefined
   ) {
+    const runId = `run-${Math.random().toString(36).slice(2, 10)}`;
     this.state = {
+      runId,
       candidateId: evidenceBank.candidateId || "user-1",
       evidenceBank,
       rawJdText,
       targetCompany,
-      rankedEvidence: [],
+      retrievedEvidence: [],
+      rerankedEvidence: [],
+      resumePlan: undefined,
+      currentDraft: undefined,
+      provenanceRecords: [],
       reflectionCount: 0,
       maxReflections: 2,
       executionTrace: [],
+      totalInputTokens: 0,
+      totalOutputTokens: 0,
+      estimatedCostUsd: 0,
       status: "idle",
     };
     this.onStepCallback = onStepUpdate;
   }
 
-  private updateStep(
+  public getRunId(): string {
+    return this.state.runId;
+  }
+
+  private async updateStep(
     agentName: AgentExecutionStep["agentName"],
     displayName: string,
     status: AgentExecutionStep["status"],
-    outputSummary?: string
+    outputSummary?: string | undefined
   ) {
     const existingIdx = this.state.executionTrace.findIndex((s) => s.agentName === agentName);
+    const existingStep = existingIdx >= 0 ? this.state.executionTrace[existingIdx] : undefined;
     const step: AgentExecutionStep = {
       agentName,
       displayName,
       status,
-      startedAt: existingIdx >= 0 ? this.state.executionTrace[existingIdx].startedAt : new Date().toISOString(),
+      startedAt: existingStep?.startedAt || new Date().toISOString(),
       finishedAt: status === "completed" || status === "failed" ? new Date().toISOString() : undefined,
       outputSummary,
       reflectionCount: this.state.reflectionCount,
@@ -96,16 +123,42 @@ export class ResumeStateGraph {
     if (this.onStepCallback) {
       this.onStepCallback(step);
     }
+
+    // Persist node execution telemetry to Supabase if authenticated
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      if (userData?.user?.id) {
+        await supabase.from("ai_run_nodes").insert({
+          run_id: undefined, // linked via FK when run exists
+          node_name: agentName,
+          display_name: displayName,
+          status,
+          output_summary: outputSummary || null,
+          created_at: step.startedAt,
+          completed_at: step.finishedAt || null,
+        });
+      }
+    } catch {
+      // non-blocking background telemetry
+    }
   }
 
   /**
    * Node 1: JD Semantic Decomposer
    */
   private async nodeJdDecomposer(): Promise<void> {
-    this.updateStep("JD_Analyzer", "Semantic JD Parser Agent", "running", "Decomposing requirements, seniority, and skill taxonomy...");
+    const promptMeta = PROMPT_REGISTRY["jd_analyzer:v1.2"];
+    await this.updateStep("JD_Analyzer", "Semantic JD Parser Agent", "running", `Decomposing requirements via ${promptMeta?.agentName || "JD Analyzer"} (${promptMeta?.version || "v1.2"})...`);
+    
+    const inTokens = estimateTokenCount(this.state.rawJdText);
     const analysis = await runJdAnalyzerAgent(this.state.rawJdText, this.state.targetCompany);
     this.state.jobAnalysis = analysis;
-    this.updateStep(
+    
+    const outTokens = estimateTokenCount(JSON.stringify(analysis));
+    this.state.totalInputTokens += inTokens;
+    this.state.totalOutputTokens += outTokens;
+
+    await this.updateStep(
       "JD_Analyzer",
       "Semantic JD Parser Agent",
       "completed",
@@ -114,18 +167,48 @@ export class ResumeStateGraph {
   }
 
   /**
-   * Node 2: Evidence RAG Retriever
+   * Node 2: Real pgvector Hybrid Evidence RAG Retriever & Cross-Encoder Reranker
    */
-  private nodeEvidenceRag(): void {
+  private async nodeEvidenceRag(): Promise<void> {
     if (!this.state.jobAnalysis) return;
-    this.updateStep("Evidence_Retriever" as any, "Evidence RAG Retriever", "running", "Ranking candidate ground-truth evidence against JD taxonomy...");
-    const ranked = retrieveAndRankCandidateEvidence(this.state.evidenceBank, this.state.jobAnalysis);
-    this.state.rankedEvidence = ranked;
-    this.updateStep(
+    await this.updateStep("Evidence_Retriever" as any, "pgvector Hybrid RAG & Reranker", "running", "Executing dense cosine similarity + BM25 sparse search + reranking...");
+
+    // Convert candidate evidence bank items into EvidenceItem format
+    const evidencePool: EvidenceItem[] = (this.state.evidenceBank.evidenceItems || []).map((item) => ({
+      id: item.id,
+      candidateId: this.state.candidateId,
+      sourceType: item.category as any,
+      title: item.title,
+      content: `${item.title} at ${item.organization || "Company"}. ${item.verifiedClaims.join(" ")}`,
+      technologies: item.technologiesUsed || [],
+      concepts: [],
+      metrics: item.metrics.map((m) => ({ metricName: "metric", metricValue: m })),
+      verified: true,
+      confidence: 1.0,
+      metadata: {},
+    }));
+
+    const query = `${this.state.jobAnalysis.roleTitle} ${this.state.jobAnalysis.requiredHardSkills.join(" ")}`;
+    const retrievalResult = await retrieveHybridCandidateEvidence(
+      query,
+      evidencePool,
+      this.state.jobAnalysis.requiredHardSkills,
+      { topK: 8 }
+    );
+    this.state.retrievedEvidence = retrievalResult.items;
+
+    // Cross-encoder reranking
+    const rerankingResult = await rerankRetrievedEvidence(
+      this.state.jobAnalysis.requiredHardSkills.slice(0, 5).join(", "),
+      retrievalResult.items
+    );
+    this.state.rerankedEvidence = rerankingResult.items;
+
+    await this.updateStep(
       "Evidence_Retriever" as any,
-      "Evidence RAG Retriever",
+      "pgvector Hybrid RAG & Reranker",
       "completed",
-      `Retrieved ${ranked.length} verified evidence items. Top relevance: ${ranked[0]?.relevanceScore || 0}%.`
+      `Retrieved ${retrievalResult.items.length} items. Reranked top match: ${rerankingResult.items[0]?.evidence.title || "Evidence"} (Score: ${Math.round((rerankingResult.items[0]?.rerankScore || 0) * 100)}%).`
     );
   }
 
@@ -134,10 +217,18 @@ export class ResumeStateGraph {
    */
   private async nodeResumePlanner(): Promise<void> {
     if (!this.state.jobAnalysis) return;
-    this.updateStep("Resume_Planner", "Resume Strategist Agent", "running", "Determining section hierarchy and keyword placement...");
+    const promptMeta = PROMPT_REGISTRY["planner:v1.1"];
+    await this.updateStep("Resume_Planner", "Resume Strategist Agent", "running", `Determining section hierarchy (${promptMeta?.version || "v1.1"})...`);
+    
+    const inTokens = estimateTokenCount(JSON.stringify(this.state.jobAnalysis)) + estimateTokenCount(JSON.stringify(this.state.evidenceBank));
     const plan = await runPlannerAgent(this.state.evidenceBank, this.state.jobAnalysis);
     this.state.resumePlan = plan;
-    this.updateStep(
+    
+    const outTokens = estimateTokenCount(JSON.stringify(plan));
+    this.state.totalInputTokens += inTokens;
+    this.state.totalOutputTokens += outTokens;
+
+    await this.updateStep(
       "Resume_Planner",
       "Resume Strategist Agent",
       "completed",
@@ -146,19 +237,21 @@ export class ResumeStateGraph {
   }
 
   /**
-   * Node 4: XYZ Achievement Synthesizer
+   * Node 4: XYZ Achievement Synthesizer & Provenance Graph Builder
    */
   private async nodeXyzSynthesizer(): Promise<void> {
     if (!this.state.jobAnalysis || !this.state.resumePlan) return;
-    this.updateStep(
+    const promptMeta = PROMPT_REGISTRY["synthesizer:v2.0"];
+    await this.updateStep(
       "XYZ_Synthesizer",
       "XYZ Content Synthesizer Agent",
       this.state.reflectionCount > 0 ? "reflection_loop" : "running",
       this.state.reflectionCount > 0
         ? `Refining draft (Reflection Pass #${this.state.reflectionCount}) addressing Guardrail feedback...`
-        : "Drafting Google XYZ formula achievements grounded in candidate evidence..."
+        : `Drafting Google XYZ formula achievements (${promptMeta?.version || "v2.0"})...`
     );
 
+    const inTokens = estimateTokenCount(JSON.stringify(this.state.resumePlan)) + estimateTokenCount(JSON.stringify(this.state.evidenceBank));
     const draft = await runSynthesizerAgent(
       this.state.evidenceBank,
       this.state.jobAnalysis,
@@ -166,11 +259,36 @@ export class ResumeStateGraph {
       this.state.criticFeedback
     );
     this.state.currentDraft = draft;
-    this.updateStep(
+
+    // Convert candidate evidence items for provenance attribution
+    const evidencePool: EvidenceItem[] = (this.state.evidenceBank.evidenceItems || []).map((item) => ({
+      id: item.id,
+      candidateId: this.state.candidateId,
+      sourceType: item.category as any,
+      title: item.title,
+      content: `${item.title} at ${item.organization || "Company"}. ${item.verifiedClaims.join(" ")}`,
+      technologies: item.technologiesUsed || [],
+      concepts: [],
+      metrics: item.metrics.map((m) => ({ metricName: "metric", metricValue: m })),
+      verified: true,
+      confidence: 1.0,
+      metadata: {},
+    }));
+
+    this.state.provenanceRecords = buildClaimProvenanceRecords(
+      draft.claims || [],
+      evidencePool
+    );
+    
+    const outTokens = estimateTokenCount(JSON.stringify(draft));
+    this.state.totalInputTokens += inTokens;
+    this.state.totalOutputTokens += outTokens;
+
+    await this.updateStep(
       "XYZ_Synthesizer",
       "XYZ Content Synthesizer Agent",
       "completed",
-      "Synthesized high-impact bullet points and targeted ATS summary."
+      `Synthesized ${draft.experience?.length || 0} roles and ${draft.projects?.length || 0} projects with Google XYZ formula.`
     );
   }
 
@@ -179,26 +297,32 @@ export class ResumeStateGraph {
    */
   private async nodeCriticGuardrail(): Promise<void> {
     if (!this.state.currentDraft) return;
-    this.updateStep(
+    const promptMeta = PROMPT_REGISTRY["critic_guardrail:v1.3"];
+    await this.updateStep(
       "Critic_Guardrail",
       "Anti-Hallucination Guardrail Agent",
       "running",
-      "Auditing claims against Candidate Ground-Truth Evidence..."
+      `Auditing claims against Candidate Ground-Truth Evidence (${promptMeta?.version || "v1.3"})...`
     );
 
+    const inTokens = estimateTokenCount(JSON.stringify(this.state.currentDraft)) + estimateTokenCount(JSON.stringify(this.state.evidenceBank));
     const report = await runCriticGuardrailAgent(this.state.currentDraft, this.state.evidenceBank);
-    this.state.guardrailReport = report;
+    this.state.guardrailReport = report as any;
 
-    if (report.isPassed || report.hallucinationScore <= 10) {
-      this.updateStep(
+    const outTokens = estimateTokenCount(JSON.stringify(report));
+    this.state.totalInputTokens += inTokens;
+    this.state.totalOutputTokens += outTokens;
+
+    if (report.passed || report.overallGroundingScore >= 80) {
+      await this.updateStep(
         "Critic_Guardrail",
         "Anti-Hallucination Guardrail Agent",
         "completed",
-        `Verification PASSED. Hallucination Risk: ${report.hallucinationScore}%. Verified ${report.verifiedClaimsCount} claims.`
+        `Verification PASSED. Grounding Score: ${report.overallGroundingScore}%. Verified ${report.verifiedClaimsCount} claims.`
       );
     } else {
       this.state.criticFeedback = report.critique;
-      this.updateStep(
+      await this.updateStep(
         "Critic_Guardrail",
         "Anti-Hallucination Guardrail Agent",
         "reflection_loop",
@@ -212,10 +336,18 @@ export class ResumeStateGraph {
    */
   private async nodeAtsAuditor(): Promise<void> {
     if (!this.state.currentDraft || !this.state.jobAnalysis) return;
-    this.updateStep("ATS_Auditor", "ATS Simulator Agent", "running", "Simulating Workday/Greenhouse/Lever parsing and keyword density...");
+    const promptMeta = PROMPT_REGISTRY["ats_auditor:v1.1"];
+    await this.updateStep("ATS_Auditor", "ATS Simulator Agent", "running", `Simulating ATS heuristic evaluation (${promptMeta?.version || "v1.1"})...`);
+    
+    const inTokens = estimateTokenCount(JSON.stringify(this.state.currentDraft)) + estimateTokenCount(JSON.stringify(this.state.jobAnalysis));
     const audit = await runAtsAuditorAgent(this.state.currentDraft, this.state.jobAnalysis);
     this.state.atsAudit = audit;
-    this.updateStep(
+    
+    const outTokens = estimateTokenCount(JSON.stringify(audit));
+    this.state.totalInputTokens += inTokens;
+    this.state.totalOutputTokens += outTokens;
+
+    await this.updateStep(
       "ATS_Auditor",
       "ATS Simulator Agent",
       "completed",
@@ -224,16 +356,17 @@ export class ResumeStateGraph {
   }
 
   /**
-   * Master Execution Entrypoint with Conditional Reflection Edges
+   * Master Execution Entrypoint with Trace Logging
    */
   public async execute(): Promise<MultiAgentPipelineResult> {
+    this.startTime = performance.now();
     this.state.status = "running";
 
     // Step 1: Decompose JD
     await this.nodeJdDecomposer();
 
     // Step 2: Evidence RAG Retrieval
-    this.nodeEvidenceRag();
+    await this.nodeEvidenceRag();
 
     // Step 3: Plan Strategy
     await this.nodeResumePlanner();
@@ -245,8 +378,8 @@ export class ResumeStateGraph {
 
       // Conditional Edge Decision
       if (
-        this.state.guardrailReport?.isPassed ||
-        (this.state.guardrailReport?.hallucinationScore ?? 0) <= 10 ||
+        (this.state.guardrailReport as any)?.passed ||
+        ((this.state.guardrailReport as any)?.overallGroundingScore ?? 0) >= 80 ||
         this.state.reflectionCount >= this.state.maxReflections
       ) {
         break;
@@ -260,6 +393,36 @@ export class ResumeStateGraph {
     await this.nodeAtsAuditor();
 
     this.state.status = "completed";
+    const totalLatency = Math.round(performance.now() - this.startTime);
+    this.state.estimatedCostUsd = calculateEstimatedCostUsd(
+      "openai/gpt-4o-mini",
+      this.state.totalInputTokens,
+      this.state.totalOutputTokens
+    );
+
+    // Persist to Supabase if authenticated session is available
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      if (userData?.user?.id) {
+        await supabase.from("ai_runs").insert({
+          id: undefined, // auto gen uuid in db
+          user_id: userData.user.id,
+          workflow: "resume_tailoring_pipeline",
+          status: "completed",
+          model: "openai/gpt-4o-mini",
+          prompt_version: "multi-agent-v2",
+          total_input_tokens: this.state.totalInputTokens,
+          total_output_tokens: this.state.totalOutputTokens,
+          estimated_cost_usd: this.state.estimatedCostUsd,
+          latency_ms: totalLatency,
+          grounding_rate: (this.state.guardrailReport as any)?.overallGroundingScore ?? 100,
+          ats_score: this.state.atsAudit?.overallScore ?? 90,
+          completed_at: new Date().toISOString(),
+        });
+      }
+    } catch (err) {
+      console.warn("[StateGraph] Background run persistence skipped:", err);
+    }
 
     return {
       jobAnalysis: this.state.jobAnalysis!,

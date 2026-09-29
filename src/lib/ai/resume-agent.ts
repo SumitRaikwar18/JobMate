@@ -1,15 +1,22 @@
 import { callOpenRouter, parseJsonFromLlm } from "./openrouter";
 
-export interface JobAnalysisResult {
+export interface JobDecomposition {
   roleTitle: string;
   company: string;
-  matchScore: number;
-  extractedSkills: string[];
-  matchedSkills: string[];
-  missingSkills: string[];
-  keyResponsibilities: string[];
-  atsRecommendations: string[];
+  seniorityLevel?: string;
+  mustHaveSkills: string[];
+  niceToHaveSkills?: string[];
+  domainKeywords?: string[];
+  coreResponsibilities: string[];
+  keyResponsibilities?: string[];
+  extractedSkills?: string[];
+  matchedSkills?: string[];
+  missingSkills?: string[];
+  matchScore?: number;
+  atsRecommendations?: string[];
 }
+
+export interface JobAnalysisResult extends JobDecomposition {}
 
 export interface AtsAuditResult {
   overallScore: number;
@@ -35,8 +42,11 @@ CRITICAL PRODUCT PRINCIPLES:
  */
 export async function analyzeJobDescriptionWithAI(
   jdText: string,
-  candidateSkills: string[] = []
+  candidateSkillsOrRole: string[] | string = [],
+  companyOverride?: string
 ): Promise<JobAnalysisResult> {
+  const candidateSkills = Array.isArray(candidateSkillsOrRole) ? candidateSkillsOrRole : [];
+  const targetRole = typeof candidateSkillsOrRole === "string" ? candidateSkillsOrRole : undefined;
   const prompt = `Analyze the following Job Description and compare it against the candidate's skills.
 
 Candidate Skills: ${JSON.stringify(candidateSkills)}
@@ -70,8 +80,15 @@ Return a valid JSON object matching this schema:
 
     if (raw) {
       const parsed = parseJsonFromLlm<JobAnalysisResult>(raw);
-      if (parsed && parsed.roleTitle && parsed.extractedSkills) {
-        return parsed;
+      if (parsed && parsed.roleTitle && (parsed.extractedSkills || parsed.mustHaveSkills)) {
+        const extracted = parsed.extractedSkills || parsed.mustHaveSkills || [];
+        return {
+          ...parsed,
+          mustHaveSkills: parsed.mustHaveSkills || extracted,
+          seniorityLevel: parsed.seniorityLevel || "Mid-Level",
+          coreResponsibilities: parsed.coreResponsibilities || parsed.keyResponsibilities || ["Develop software features"],
+          keyResponsibilities: parsed.keyResponsibilities || parsed.coreResponsibilities || ["Develop software features"],
+        };
       }
     }
   } catch (err) {
@@ -84,25 +101,33 @@ Return a valid JSON object matching this schema:
     "TailwindCSS", "Next.js", "Docker", "AWS", "Git", "REST APIs", "GraphQL", "CI/CD", "Jest"
   ];
   const found = commonTech.filter((t) => jdText.toLowerCase().includes(t.toLowerCase()));
-  const matched = found.filter((t) => candidateSkills.some((s) => s.toLowerCase() === t.toLowerCase()));
-  const missing = found.filter((t) => !matched.includes(t));
+  const extractedSkills = found.length > 0 ? found : ["TypeScript", "React", "Node.js", "SQL", "REST APIs"];
+  const matched = extractedSkills.filter((t) => candidateSkills.some((s) => s.toLowerCase() === t.toLowerCase()));
+  const missing = extractedSkills.filter((t) => !matched.includes(t));
 
   return {
-    roleTitle: "Software Engineer",
-    company: "Target Employer",
+    roleTitle: targetRole || "Software Engineer",
+    company: companyOverride || "Target Employer",
+    seniorityLevel: jdText.toLowerCase().includes("senior") ? "Senior" : "Mid-Level",
+    mustHaveSkills: extractedSkills,
     matchScore: found.length > 0 ? Math.min(95, Math.max(70, Math.round((matched.length / Math.max(1, found.length)) * 100))) : 86,
-    extractedSkills: found.length > 0 ? found : ["TypeScript", "React", "Node.js", "SQL", "REST APIs"],
+    extractedSkills,
     matchedSkills: matched.length > 0 ? matched : ["React", "TypeScript", "Git"],
     missingSkills: missing.length > 0 ? missing : ["CI/CD", "Docker", "AWS"],
+    coreResponsibilities: [
+      "Build modular, responsive web features with modern frontend architectures",
+      "Collaborate with cross-functional product and engineering teams",
+      "Optimize application performance, core web vitals, and reliability",
+    ],
     keyResponsibilities: [
       "Build modular, responsive web features with modern frontend architectures",
       "Collaborate with cross-functional product and engineering teams",
-      "Optimize application performance, core web vitals, and unit test coverage",
+      "Optimize application performance, core web vitals, and reliability",
     ],
     atsRecommendations: [
       "Explicitly mention target keywords in your work experience bullet points",
-      "Quantify your results with percentages, latency drops, or user metrics (XYZ formula)",
-      "Ensure clean single-column structure to guarantee 100% parser readability",
+      "Quantify your results with factual metrics where supported by real experience",
+      "Ensure clean single-column structure to guarantee high ATS parser readability",
     ],
   };
 }

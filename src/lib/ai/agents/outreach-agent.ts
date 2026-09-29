@@ -32,11 +32,11 @@ CRITICAL PRINCIPLES:
 export async function generateOutreachPackage(params: {
   jobTitle: string;
   company: string;
-  jobDescription?: string;
+  jobDescription?: string | undefined;
   candidateName: string;
-  candidateHeadline?: string;
-  candidateTopProjects?: string[];
-  hiringManagerName?: string;
+  candidateHeadline?: string | undefined;
+  candidateTopProjects?: string[] | undefined;
+  hiringManagerName?: string | undefined;
 }): Promise<OutreachGenerationResult> {
   const {
     jobTitle,
