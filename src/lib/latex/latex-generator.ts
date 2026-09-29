@@ -154,16 +154,50 @@ export function generateLatexResumeSource(data: LatexResumeInput): string {
     skillCategories.push({ label: "Core Competencies", items: rawSkills.softSkills });
   }
 
+  const tid = data.templateId || "modern-clean";
+
+  // Customize layout parameters based on template ID
+  let geometryStr = "left=0.60in,right=0.60in,top=0.32in,bottom=0.30in";
+  let fontPkg = "\\usepackage{lmodern}";
+  let itemSep = "1.5pt";
+  let lineSpread = "0.95";
+  let sectionTitleFormat = "\\titleformat{\\section}{\\bfseries\\large}{}{0em}{}[\\titlerule]";
+
+  if (tid === "tech-minimalist" || tid === "minimal") {
+    geometryStr = "left=0.50in,right=0.50in,top=0.25in,bottom=0.25in";
+    itemSep = "1.0pt";
+    lineSpread = "0.92";
+    sectionTitleFormat = "\\titleformat{\\section}{\\bfseries\\normalsize\\scshape}{}{0em}{}[\\titlerule]";
+  } else if (tid === "ivy-classic" || tid === "classic") {
+    geometryStr = "left=0.65in,right=0.65in,top=0.40in,bottom=0.38in";
+    fontPkg = "\\usepackage{mathpazo}";
+    itemSep = "1.8pt";
+    lineSpread = "0.98";
+    sectionTitleFormat = "\\titleformat{\\section}{\\bfseries\\large\\scshape}{}{0em}{}[\\titlerule]";
+  } else if (tid === "executive-pro") {
+    geometryStr = "left=0.60in,right=0.60in,top=0.35in,bottom=0.35in";
+    fontPkg = "\\usepackage{lmodern}";
+    itemSep = "1.6pt";
+    lineSpread = "0.96";
+    sectionTitleFormat = "\\titleformat{\\section}{\\bfseries\\large}{}{0em}{}[\\vspace{-2pt}\\rule{\\textwidth}{1pt}]";
+  } else if (tid === "ai-researcher" || tid === "technical") {
+    geometryStr = "left=0.55in,right=0.55in,top=0.30in,bottom=0.30in";
+    fontPkg = "\\usepackage{lmodern}";
+    itemSep = "1.2pt";
+    lineSpread = "0.94";
+    sectionTitleFormat = "\\titleformat{\\section}{\\bfseries\\large}{}{0em}{}[\\titlerule]";
+  }
+
   let latex = `%-------------------------
-% JobMate ATS-First Single-Column Resume
+% JobMate ATS-First Single-Column Resume (Template: ${escapeLatex(tid)})
 % Generated dynamically via JobMate Deterministic LaTeX Engine
 %-------------------------
 
 \\documentclass[letterpaper,11pt]{article}
 
 %----------PACKAGES----------
-\\usepackage[letterpaper,left=0.60in,right=0.60in,top=0.32in,bottom=0.30in]{geometry}
-\\usepackage{lmodern}
+\\usepackage[letterpaper,${geometryStr}]{geometry}
+${fontPkg}
 \\usepackage{cmap}
 \\usepackage[T1]{fontenc}
 \\usepackage[english]{babel}
@@ -179,19 +213,16 @@ export function generateLatexResumeSource(data: LatexResumeInput): string {
 \\raggedright
 \\setlength{\\parindent}{0pt}
 \\setlength{\\parskip}{0pt}
-\\linespread{0.95}
+\\linespread{${lineSpread}}
 
 %----------SECTION STYLE----------
-\\titleformat{\\section}
-  {\\bfseries\\large}
-  {}{0em}{}
-  [\\titlerule]
+${sectionTitleFormat}
 \\titlespacing*{\\section}{0pt}{3.5pt}{2pt}
 
 %----------LIST SPACING----------
 \\setlist[itemize]{
   leftmargin=0.20in,
-  itemsep=1.5pt,
+  itemsep=${itemSep},
   topsep=1.7pt,
   parsep=0pt,
   partopsep=0pt

@@ -6,13 +6,12 @@ import {
   FileCode,
   ZoomIn,
   ZoomOut,
-  Maximize2,
   Copy,
   Check,
   Download,
   Eye,
   Sparkles,
-  Layers,
+  Layout,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -20,12 +19,31 @@ import { generateLatexResumeSource } from "@/lib/latex/latex-generator";
 import { toast } from "sonner";
 import type { ResumeDataState } from "@/routes/builder";
 
+export type TemplateOptionId =
+  | "modern-clean"
+  | "tech-minimalist"
+  | "executive-pro"
+  | "ivy-classic"
+  | "ai-researcher"
+  | "modern"
+  | "classic"
+  | "minimal"
+  | "technical";
+
 interface ResumePaperCanvasProps {
   resumeData: ResumeDataState;
-  template: "modern" | "classic" | "minimal" | "technical";
-  onTemplateChange: (template: "modern" | "classic" | "minimal" | "technical") => void;
+  template: string;
+  onTemplateChange: (template: string) => void;
   atsScore?: number | undefined;
 }
+
+export const TEMPLATE_LIST = [
+  { id: "modern-clean", label: "Modern Clean", badge: "ATS Standard" },
+  { id: "tech-minimalist", label: "Tech Minimalist", badge: "High Density" },
+  { id: "executive-pro", label: "Executive Pro", badge: "Leadership" },
+  { id: "ivy-classic", label: "Ivy Classic", badge: "Academic Serif" },
+  { id: "ai-researcher", label: "AI Researcher", badge: "ML / Systems" },
+];
 
 export function ResumePaperCanvas({
   resumeData,
@@ -36,9 +54,16 @@ export function ResumePaperCanvas({
   const paperRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState<number>(100);
   const [isOverflowing, setIsOverflowing] = useState<boolean>(false);
-  const [showLatexModal, setShowLatexModal] = useState<boolean>(false);
   const [copiedLatex, setCopiedLatex] = useState<boolean>(false);
   const [viewMode, setViewMode] = useState<"canvas" | "latex">("canvas");
+
+  // Normalize incoming template strings
+  const activeTemplate =
+    template === "modern" ? "modern-clean" :
+    template === "classic" ? "ivy-classic" :
+    template === "minimal" ? "tech-minimalist" :
+    template === "technical" ? "ai-researcher" :
+    template || "modern-clean";
 
   // Standard A4 page height in pixels at 96 DPI is ~1123px (minus margins ~ 960px content)
   const A4_HEIGHT_THRESHOLD_PX = 1050;
@@ -48,11 +73,14 @@ export function ResumePaperCanvas({
       const height = paperRef.current.scrollHeight;
       setIsOverflowing(height > A4_HEIGHT_THRESHOLD_PX);
     }
-  }, [resumeData, template]);
+  }, [resumeData, activeTemplate]);
 
   const latexSource = React.useMemo(() => {
-    return generateLatexResumeSource(resumeData as any);
-  }, [resumeData]);
+    return generateLatexResumeSource({
+      ...resumeData,
+      templateId: activeTemplate,
+    } as any);
+  }, [resumeData, activeTemplate]);
 
   const handlePrint = () => {
     window.print();
@@ -70,7 +98,7 @@ export function ResumePaperCanvas({
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${(resumeData.personal.name || "resume").toLowerCase().replace(/\s+/g, "_")}.tex`;
+    a.download = `${(resumeData.personal.name || "resume").toLowerCase().replace(/\s+/g, "_")}_${activeTemplate}.tex`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -83,34 +111,40 @@ export function ResumePaperCanvas({
       {/* Top Controls Bar */}
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-card/80 p-2.5 backdrop-blur-sm shadow-xs print:hidden">
         {/* Template Selector */}
-        <div className="flex items-center gap-1.5 overflow-x-auto">
-          <span className="text-xs font-semibold text-muted-foreground mr-1 hidden sm:inline">
-            Style:
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+          <span className="text-xs font-semibold text-muted-foreground mr-1 hidden sm:inline flex items-center gap-1">
+            <Layout className="size-3.5" /> Template:
           </span>
-          {[
-            { id: "modern", label: "Modern ATS" },
-            { id: "classic", label: "Classic Serif" },
-            { id: "technical", label: "Engineering" },
-            { id: "minimal", label: "Minimalist" },
-          ].map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => onTemplateChange(t.id as any)}
-              className={cn(
-                "rounded-lg px-2.5 py-1 text-xs font-medium transition-all whitespace-nowrap",
-                template === t.id
-                  ? "bg-primary text-primary-foreground font-bold shadow-xs"
-                  : "bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted"
-              )}
-            >
-              {t.label}
-            </button>
-          ))}
+          {TEMPLATE_LIST.map((t) => {
+            const isSelected = activeTemplate === t.id;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => {
+                  onTemplateChange(t.id);
+                  toast.success(`Switched to ${t.label} layout`);
+                }}
+                className={cn(
+                  "rounded-lg px-2.5 py-1 text-xs font-medium transition-all whitespace-nowrap flex items-center gap-1.5",
+                  isSelected
+                    ? "bg-indigo-600 text-white font-bold shadow-xs scale-[1.02]"
+                    : "bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted"
+                )}
+              >
+                <span>{t.label}</span>
+                {isSelected && (
+                  <span className="text-[9px] bg-white/20 px-1 py-0.2 rounded font-semibold">
+                    Active
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {/* Action Controls & View Switcher */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {/* Zoom controls */}
           <div className="hidden sm:flex items-center gap-1 bg-muted/40 rounded-lg p-0.5 border border-border/50 text-xs">
             <button
@@ -183,11 +217,11 @@ export function ResumePaperCanvas({
           )}
         </div>
 
-        {atsScore && (
+        {atsScore ? (
           <span className="text-[11px] font-bold text-muted-foreground">
             ATS Score: <span className="text-primary">{atsScore}%</span>
           </span>
-        )}
+        ) : null}
       </div>
 
       {/* Visual Canvas OR LaTeX Code View */}
@@ -196,7 +230,9 @@ export function ResumePaperCanvas({
           <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-3">
             <div className="flex items-center gap-2">
               <FileCode className="size-4 text-primary" />
-              <span className="font-semibold text-slate-300">Deterministic LaTeX Source (.tex)</span>
+              <span className="font-semibold text-slate-300">
+                Deterministic LaTeX Source ({activeTemplate})
+              </span>
             </div>
             <div className="flex items-center gap-2">
               <Button
@@ -213,7 +249,7 @@ export function ResumePaperCanvas({
                 type="button"
                 size="sm"
                 onClick={handleDownloadLatex}
-                className="h-7 text-xs bg-primary hover:bg-primary/90 text-primary-foreground gap-1.5 font-medium"
+                className="h-7 text-xs bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5 font-medium"
               >
                 <Download className="size-3" /> Download .tex
               </Button>
@@ -239,48 +275,77 @@ export function ResumePaperCanvas({
               ref={paperRef}
               id="resume-document"
               className={cn(
-                "w-full bg-white text-slate-900 p-8 sm:p-12 rounded-xl shadow-2xl border border-slate-200 select-text transition-all",
-                template === "classic" && "font-serif",
-                template === "minimal" && "font-mono text-xs",
-                template === "technical" && "font-sans",
-                template === "modern" && "font-sans"
+                "w-full bg-white text-slate-900 rounded-xl shadow-2xl border border-slate-200 select-text transition-all",
+                // 1. MODERN CLEAN
+                activeTemplate === "modern-clean" && "p-8 sm:p-12 font-sans",
+                // 2. TECH MINIMALIST (High density, tight margins, crisp typography)
+                activeTemplate === "tech-minimalist" && "p-6 sm:p-8 font-sans text-xs tracking-tight",
+                // 3. EXECUTIVE PRO (Rich formal serif, prominent header)
+                activeTemplate === "executive-pro" && "p-8 sm:p-12 font-serif",
+                // 4. IVY CLASSIC (Academic Computer Modern serif, centered header)
+                activeTemplate === "ivy-classic" && "p-8 sm:p-12 font-serif",
+                // 5. AI RESEARCHER (Tech-forward, highlighted taxonomy, code accents)
+                activeTemplate === "ai-researcher" && "p-7 sm:p-10 font-sans"
               )}
               style={{ minHeight: "1050px" }}
             >
               {/* Header Section */}
               <div
                 className={cn(
-                  "border-b pb-3.5",
-                  template === "classic" ? "border-slate-800 text-center" : "border-slate-300",
-                  template === "technical" && "border-slate-900 pb-2"
+                  "pb-3.5",
+                  activeTemplate === "modern-clean" && "border-b border-slate-300",
+                  activeTemplate === "tech-minimalist" && "border-b-2 border-slate-900 pb-2 mb-2",
+                  activeTemplate === "executive-pro" && "border-b-2 border-slate-900 text-center pb-4",
+                  activeTemplate === "ivy-classic" && "border-b border-slate-400 text-center pb-3",
+                  activeTemplate === "ai-researcher" && "border-b-2 border-indigo-600/60 pb-3"
                 )}
               >
                 <div
                   className={cn(
-                    "flex flex-col sm:flex-row sm:items-baseline",
-                    template === "classic" ? "justify-center" : "justify-between"
+                    "flex flex-col",
+                    (activeTemplate === "ivy-classic" || activeTemplate === "executive-pro")
+                      ? "items-center justify-center text-center"
+                      : "sm:flex-row sm:items-baseline sm:justify-between"
                   )}
                 >
                   <h1
                     className={cn(
-                      "text-2xl sm:text-3xl font-black tracking-tight text-slate-950",
-                      template === "classic" && "tracking-normal font-bold uppercase text-2xl"
+                      "text-slate-950",
+                      activeTemplate === "modern-clean" && "text-2xl sm:text-3xl font-black tracking-tight",
+                      activeTemplate === "tech-minimalist" && "text-xl sm:text-2xl font-black tracking-tighter uppercase font-mono",
+                      activeTemplate === "executive-pro" && "text-2xl sm:text-3xl font-bold uppercase tracking-wider text-slate-950 font-serif",
+                      activeTemplate === "ivy-classic" && "text-2xl sm:text-3xl font-normal uppercase tracking-widest text-slate-950 font-serif",
+                      activeTemplate === "ai-researcher" && "text-2xl sm:text-3xl font-black tracking-tight text-indigo-950"
                     )}
                   >
                     {resumeData.personal.name || "Your Name"}
                   </h1>
-                  {template !== "classic" && (
-                    <span className="text-xs font-bold text-indigo-600 sm:text-sm">
+
+                  {activeTemplate !== "ivy-classic" && activeTemplate !== "executive-pro" && (
+                    <span className={cn(
+                      "text-xs font-bold sm:text-sm",
+                      activeTemplate === "ai-researcher" ? "text-indigo-600 font-mono" : "text-indigo-600"
+                    )}>
                       {resumeData.personal.targetRole}
                     </span>
                   )}
                 </div>
 
+                {/* Subheader Title for Executive & Ivy */}
+                {(activeTemplate === "executive-pro" || activeTemplate === "ivy-classic") && (
+                  <p className="mt-0.5 text-xs font-semibold text-slate-700 tracking-wide">
+                    {resumeData.personal.targetRole}
+                  </p>
+                )}
+
                 {/* Subheader Contact Links */}
                 <div
                   className={cn(
                     "mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-slate-600",
-                    template === "classic" ? "justify-center" : "justify-start"
+                    (activeTemplate === "ivy-classic" || activeTemplate === "executive-pro")
+                      ? "justify-center"
+                      : "justify-start",
+                    activeTemplate === "tech-minimalist" && "font-mono text-[10px]"
                   )}
                 >
                   {resumeData.personal.location && <span>{resumeData.personal.location}</span>}
@@ -300,18 +365,77 @@ export function ResumePaperCanvas({
 
               {/* Professional Summary */}
               {resumeData.summary && (
-                <div className="mt-3.5">
-                  <h2 className="text-xs font-bold uppercase tracking-wider text-slate-950 border-b border-slate-200 pb-0.5 mb-1.5">
-                    Professional Summary
+                <div className={cn(
+                  "mt-3.5",
+                  activeTemplate === "executive-pro" && "rounded-lg bg-slate-50 border border-slate-200/80 p-3",
+                  activeTemplate === "tech-minimalist" && "mt-2"
+                )}>
+                  <h2 className={cn(
+                    "text-xs font-bold uppercase tracking-wider pb-0.5 mb-1.5",
+                    activeTemplate === "executive-pro" ? "text-slate-900 border-b border-slate-300 font-serif" :
+                    activeTemplate === "ivy-classic" ? "text-slate-950 border-b border-slate-300 font-serif text-center" :
+                    activeTemplate === "tech-minimalist" ? "text-slate-950 border-b border-slate-900 font-mono text-[10px]" :
+                    activeTemplate === "ai-researcher" ? "text-indigo-950 border-b border-indigo-200" :
+                    "text-slate-950 border-b border-slate-200"
+                  )}>
+                    {activeTemplate === "executive-pro" ? "Executive Summary" : "Professional Summary"}
                   </h2>
-                  <p className="text-xs leading-relaxed text-slate-700">{resumeData.summary}</p>
+                  <p className={cn(
+                    "text-xs leading-relaxed text-slate-700",
+                    activeTemplate === "executive-pro" && "font-serif text-slate-800 text-[11.5px]"
+                  )}>
+                    {resumeData.summary}
+                  </p>
                 </div>
+              )}
+
+              {/* Technical Skills Section (Rendered near top for Tech / AI templates) */}
+              {(activeTemplate === "tech-minimalist" || activeTemplate === "ai-researcher") && (
+                (resumeData.skills.languages.length > 0 ||
+                  resumeData.skills.frameworks.length > 0 ||
+                  resumeData.skills.tools.length > 0) && (
+                  <div className="mt-3 space-y-1">
+                    <h2 className={cn(
+                      "text-xs font-bold uppercase tracking-wider pb-0.5",
+                      activeTemplate === "tech-minimalist" ? "text-slate-950 border-b border-slate-900 font-mono text-[10px]" : "text-indigo-950 border-b border-indigo-200"
+                    )}>
+                      Technical Stack & Infrastructure
+                    </h2>
+                    <div className="text-xs text-slate-700 space-y-0.5">
+                      {resumeData.skills.languages.length > 0 && (
+                        <p>
+                          <strong className="text-slate-900">Languages:</strong>{" "}
+                          {resumeData.skills.languages.join(", ")}
+                        </p>
+                      )}
+                      {resumeData.skills.frameworks.length > 0 && (
+                        <p>
+                          <strong className="text-slate-900">Frameworks:</strong>{" "}
+                          {resumeData.skills.frameworks.join(", ")}
+                        </p>
+                      )}
+                      {resumeData.skills.tools.length > 0 && (
+                        <p>
+                          <strong className="text-slate-900">Infrastructure & Tools:</strong>{" "}
+                          {resumeData.skills.tools.join(", ")}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )
               )}
 
               {/* Experience Section */}
               {resumeData.experiences.length > 0 && (
-                <div className="mt-4 space-y-3">
-                  <h2 className="text-xs font-bold uppercase tracking-wider text-slate-950 border-b border-slate-200 pb-0.5">
+                <div className={cn("mt-4 space-y-3", activeTemplate === "tech-minimalist" && "mt-2.5 space-y-2")}>
+                  <h2 className={cn(
+                    "text-xs font-bold uppercase tracking-wider pb-0.5",
+                    activeTemplate === "executive-pro" ? "text-slate-900 border-b-2 border-slate-800 font-serif" :
+                    activeTemplate === "ivy-classic" ? "text-slate-950 border-b border-slate-300 font-serif" :
+                    activeTemplate === "tech-minimalist" ? "text-slate-950 border-b border-slate-900 font-mono text-[10px]" :
+                    activeTemplate === "ai-researcher" ? "text-indigo-950 border-b border-indigo-200" :
+                    "text-slate-950 border-b border-slate-200"
+                  )}>
                     Work Experience
                   </h2>
 
@@ -322,7 +446,10 @@ export function ResumePaperCanvas({
                           {exp.role} <span className="font-normal text-slate-600">— {exp.company}</span>
                           {exp.location && <span className="font-normal text-slate-500"> ({exp.location})</span>}
                         </span>
-                        <span className="text-[11px] font-normal text-slate-500 whitespace-nowrap">
+                        <span className={cn(
+                          "text-[11px] font-normal text-slate-500 whitespace-nowrap",
+                          activeTemplate === "tech-minimalist" && "font-mono text-[10px]"
+                        )}>
                           {exp.startDate} – {exp.endDate}
                         </span>
                       </div>
@@ -339,9 +466,16 @@ export function ResumePaperCanvas({
 
               {/* Featured Projects */}
               {resumeData.projects.length > 0 && (
-                <div className="mt-4 space-y-2.5">
-                  <h2 className="text-xs font-bold uppercase tracking-wider text-slate-950 border-b border-slate-200 pb-0.5">
-                    Key Projects & Technical Implementations
+                <div className={cn("mt-4 space-y-2.5", activeTemplate === "tech-minimalist" && "mt-2.5 space-y-1.5")}>
+                  <h2 className={cn(
+                    "text-xs font-bold uppercase tracking-wider pb-0.5",
+                    activeTemplate === "executive-pro" ? "text-slate-900 border-b-2 border-slate-800 font-serif" :
+                    activeTemplate === "ivy-classic" ? "text-slate-950 border-b border-slate-300 font-serif" :
+                    activeTemplate === "tech-minimalist" ? "text-slate-950 border-b border-slate-900 font-mono text-[10px]" :
+                    activeTemplate === "ai-researcher" ? "text-indigo-950 border-b border-indigo-200" :
+                    "text-slate-950 border-b border-slate-200"
+                  )}>
+                    {activeTemplate === "ai-researcher" ? "Key Systems & AI Implementations" : "Key Projects & Engineering"}
                   </h2>
 
                   {resumeData.projects.map((proj) => (
@@ -350,7 +484,12 @@ export function ResumePaperCanvas({
                         <span>
                           {proj.name}{" "}
                           {proj.technologies && (
-                            <span className="font-normal text-slate-600">| {proj.technologies}</span>
+                            <span className={cn(
+                              "font-normal text-slate-600",
+                              activeTemplate === "tech-minimalist" && "font-mono text-[10px] text-slate-500"
+                            )}>
+                              | {proj.technologies}
+                            </span>
                           )}
                         </span>
                         {proj.link && (
@@ -371,37 +510,74 @@ export function ResumePaperCanvas({
                 </div>
               )}
 
-              {/* Skills Section */}
-              <div className="mt-4 space-y-1">
-                <h2 className="text-xs font-bold uppercase tracking-wider text-slate-950 border-b border-slate-200 pb-0.5">
-                  Technical Skills & Competencies
-                </h2>
-                <div className="text-xs text-slate-700 space-y-0.5">
-                  {resumeData.skills.languages.length > 0 && (
-                    <p>
-                      <strong className="text-slate-900">Languages:</strong>{" "}
-                      {resumeData.skills.languages.join(", ")}
+              {/* Technical Skills Section (Rendered near bottom for Standard / Ivy / Executive) */}
+              {activeTemplate !== "tech-minimalist" && activeTemplate !== "ai-researcher" && (
+                (resumeData.skills.languages.length > 0 ||
+                  resumeData.skills.frameworks.length > 0 ||
+                  resumeData.skills.tools.length > 0) && (
+                  <div className="mt-4 space-y-1">
+                    <h2 className={cn(
+                      "text-xs font-bold uppercase tracking-wider pb-0.5",
+                      activeTemplate === "executive-pro" ? "text-slate-900 border-b-2 border-slate-800 font-serif" :
+                      activeTemplate === "ivy-classic" ? "text-slate-950 border-b border-slate-300 font-serif" :
+                      "text-slate-950 border-b border-slate-200"
+                    )}>
+                      Technical Skills & Competencies
+                    </h2>
+                    <div className="text-xs text-slate-700 space-y-0.5">
+                      {resumeData.skills.languages.length > 0 && (
+                        <p>
+                          <strong className="text-slate-900">Languages:</strong>{" "}
+                          {resumeData.skills.languages.join(", ")}
+                        </p>
+                      )}
+                      {resumeData.skills.frameworks.length > 0 && (
+                        <p>
+                          <strong className="text-slate-900">Frameworks & Libraries:</strong>{" "}
+                          {resumeData.skills.frameworks.join(", ")}
+                        </p>
+                      )}
+                      {resumeData.skills.tools.length > 0 && (
+                        <p>
+                          <strong className="text-slate-900">Infrastructure, Databases & Tools:</strong>{" "}
+                          {resumeData.skills.tools.join(", ")}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )
+              )}
+
+              {/* Empty Resume Guided Placeholder */}
+              {!resumeData.summary &&
+                resumeData.experiences.length === 0 &&
+                resumeData.projects.length === 0 &&
+                resumeData.skills.languages.length === 0 &&
+                resumeData.skills.frameworks.length === 0 &&
+                resumeData.skills.tools.length === 0 &&
+                resumeData.education.length === 0 && (
+                  <div className="my-10 rounded-xl border border-dashed border-slate-200 bg-slate-50/70 p-8 text-center">
+                    <Sparkles className="mx-auto size-8 text-indigo-500 mb-2.5 opacity-80" />
+                    <h3 className="text-sm font-bold text-slate-800">
+                      Blank Resume Canvas ({TEMPLATE_LIST.find((t) => t.id === activeTemplate)?.label || "Modern Clean"})
+                    </h3>
+                    <p className="mt-1 text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+                      Use the <strong>AI Resume Copilot</strong> on the left or the <strong>Section Form Editor</strong> to add your work experience, projects, skills, and education.
                     </p>
-                  )}
-                  {resumeData.skills.frameworks.length > 0 && (
-                    <p>
-                      <strong className="text-slate-900">Frameworks & Libraries:</strong>{" "}
-                      {resumeData.skills.frameworks.join(", ")}
-                    </p>
-                  )}
-                  {resumeData.skills.tools.length > 0 && (
-                    <p>
-                      <strong className="text-slate-900">Infrastructure, Databases & Tools:</strong>{" "}
-                      {resumeData.skills.tools.join(", ")}
-                    </p>
-                  )}
-                </div>
-              </div>
+                  </div>
+                )}
 
               {/* Education Section */}
               {resumeData.education.length > 0 && (
-                <div className="mt-4 space-y-1.5">
-                  <h2 className="text-xs font-bold uppercase tracking-wider text-slate-950 border-b border-slate-200 pb-0.5">
+                <div className={cn("mt-4 space-y-1.5", activeTemplate === "tech-minimalist" && "mt-2.5")}>
+                  <h2 className={cn(
+                    "text-xs font-bold uppercase tracking-wider pb-0.5",
+                    activeTemplate === "executive-pro" ? "text-slate-900 border-b-2 border-slate-800 font-serif" :
+                    activeTemplate === "ivy-classic" ? "text-slate-950 border-b border-slate-300 font-serif" :
+                    activeTemplate === "tech-minimalist" ? "text-slate-950 border-b border-slate-900 font-mono text-[10px]" :
+                    activeTemplate === "ai-researcher" ? "text-indigo-950 border-b border-indigo-200" :
+                    "text-slate-950 border-b border-slate-200"
+                  )}>
                     Education
                   </h2>
 
@@ -411,7 +587,10 @@ export function ResumePaperCanvas({
                         <strong className="text-slate-950">{edu.degree}</strong> • {edu.institution}
                         {edu.location && <span className="text-slate-500"> ({edu.location})</span>}
                       </div>
-                      <span className="text-[11px] text-slate-500">
+                      <span className={cn(
+                        "text-[11px] text-slate-500",
+                        activeTemplate === "tech-minimalist" && "font-mono text-[10px]"
+                      )}>
                         {edu.score || `${edu.startDate} – ${edu.endDate}`}
                       </span>
                     </div>

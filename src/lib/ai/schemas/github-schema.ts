@@ -28,6 +28,7 @@ export type GitHubClaim = z.infer<typeof GitHubClaimSchema>;
 export const GitHubAnalysisSchema = z.object({
   repoUrl: z.string(),
   fullName: z.string(),
+  projectTitle: z.string().optional(),
   description: z.string().default(""),
   primaryLanguage: z.string().default(""),
   languages: z.record(z.number()).default({}),

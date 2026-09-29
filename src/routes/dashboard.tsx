@@ -131,20 +131,17 @@ function DashboardPage() {
     }
   }, [user, authLoading]);
 
-  // Dynamic ATS Score Calculation based on user's real resumes and profile completeness
-  const computeDynamicAtsScore = () => {
+  // Dynamic ATS Score Calculation based on user's real resumes
+  const computeDynamicAtsScore = (): number | null => {
     if (resumes.length === 0) {
-      // Base score on ground-truth profile completeness
-      let base = 70;
-      if (profile?.headline) base += 8;
-      if (profile?.target_role) base += 8;
-      if (profile?.github_url) base += 5;
-      if (profile?.linkedin_url) base += 5;
-      return Math.min(94, base);
+      return null;
     }
-    const scores = resumes.map((r) => r.ats_score || 88);
-    const sum = scores.reduce((a, b) => a + b, 0);
-    return Math.round(sum / scores.length);
+    const scoredResumes = resumes.filter((r) => typeof r.ats_score === "number" && r.ats_score > 0);
+    if (scoredResumes.length === 0) {
+      return null;
+    }
+    const sum = scoredResumes.reduce((acc, r) => acc + (r.ats_score || 0), 0);
+    return Math.round(sum / scoredResumes.length);
   };
 
   const dynamicAtsScore = computeDynamicAtsScore();
@@ -351,11 +348,17 @@ function DashboardPage() {
               </div>
               <div className="mt-2 flex items-baseline gap-2">
                 <span className="text-2xl font-black text-slate-900 dark:text-white">
-                  {dynamicAtsScore}%
+                  {dynamicAtsScore !== null ? `${dynamicAtsScore}%` : "—"}
                 </span>
                 <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center">
-                  <TrendingUp className="size-3 mr-0.5" />
-                  Live Sync
+                  {dynamicAtsScore !== null ? (
+                    <>
+                      <TrendingUp className="size-3 mr-0.5" />
+                      Live Sync
+                    </>
+                  ) : (
+                    <span className="text-slate-400 font-normal">No resumes yet</span>
+                  )}
                 </span>
               </div>
             </div>

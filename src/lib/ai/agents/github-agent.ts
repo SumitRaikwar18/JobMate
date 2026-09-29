@@ -28,6 +28,22 @@ CRITICAL PRINCIPLES:
 3. Formulate 2-3 distinct resume bullets following the XYZ formula ("Accomplished [X] measured by [Y], by doing [Z]") ONLY where [Y] is supported by repository evidence.
 4. Output strictly valid JSON conforming to the schema.`;
 
+function cleanProjectTitle(rawTitle: string, repoName: string): string {
+  const candidate = (rawTitle || repoName || "Software Project")
+    .replace(/^.*\//, "") // strip owner/ prefix (e.g. NikhilRaikwar/PlanProof -> PlanProof)
+    .replace(/\.git$/i, "")
+    .replace(/[-_]/g, " ")
+    .trim();
+  return candidate.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function filterKeyTechnologies(technologies: string[], primaryLanguage: string): string[] {
+  const noise = new Set(["powershell", "shell", "dockerfile", "makefile", "html", "css", "batchfile", "scss", "sass"]);
+  const filtered = technologies.filter((t) => !noise.has(t.toLowerCase().trim()));
+  const list = filtered.length > 0 ? filtered : [primaryLanguage];
+  return Array.from(new Set(list)).slice(0, 5);
+}
+
 /**
  * Executes the full GitHub Code Intelligence Agent pipeline
  */
@@ -41,25 +57,32 @@ export async function analyzeGitHubRepository(repoUrlOrSlug: string): Promise<Gi
     .map(([file, content]) => `--- ${file} ---\n${content}`)
     .join("\n\n");
 
-  const userPrompt = `Analyze this repository and generate grounded resume bullets and engineering evidence.
+  const cleanTitle = cleanProjectTitle(repoData.repo, repoData.repo);
 
-Repository: ${repoData.fullName}
+  const userPrompt = `Analyze this public GitHub repository and extract concrete, truth-grounded resume accomplishment bullets and engineering architecture.
+
+Repository Name: ${cleanTitle} (Full: ${repoData.fullName})
 Description: ${repoData.description || "No description provided."}
 Primary Language: ${repoData.primaryLanguage}
-Languages Distribution: ${JSON.stringify(repoData.languages)}
+Detected Language Breakdown: ${JSON.stringify(repoData.languages)}
 Topics/Tags: ${JSON.stringify(repoData.topics)}
 Stars: ${repoData.stars} | Forks: ${repoData.forks}
 
-Root File Tree:
+Root Directory Manifests:
 ${repoData.fileTree.join("\n")}
 
-Manifest Files:
+Key Manifest Files:
 ${manifestSummaries || "No manifest files detected."}
 
-README Preview:
+README Content:
 """
 ${repoData.readmeContent || "No README provided."}
 """
+
+Instructions:
+1. In 'projectTitle', return clean "${cleanTitle}". Do NOT prefix with the GitHub username.
+2. In 'detectedTechnologies', prioritize the top 3-5 core languages and frameworks (e.g. Python, TypeScript, React, FastAPI, Docker). Exclude noise like CSS, HTML, PowerShell, Dockerfile.
+3. In 'xyzBullets', synthesize 2 to 3 detailed, technical accomplishment bullets following Google's XYZ formula ("Accomplished [X] measured by [Y], by doing [Z]"). Detail what the application does, its architectural components, and technical challenges solved.
 
 Return a strictly valid JSON GitHubAnalysis object.`;
 
@@ -74,19 +97,27 @@ Return a strictly valid JSON GitHubAnalysis object.`;
     });
 
     const parsed = result.data;
+    const finalTitle = cleanProjectTitle(parsed.fullName || parsed.projectTitle || "", repoData.repo);
+    const finalTech = filterKeyTechnologies(
+      parsed.detectedTechnologies.length > 0 ? parsed.detectedTechnologies : Object.keys(repoData.languages),
+      repoData.primaryLanguage
+    );
+
+    const bullets = parsed.xyzBullets.length >= 2 ? parsed.xyzBullets : [
+      `Architected and engineered ${finalTitle} using ${finalTech.slice(0, 3).join(", ")}, implementing modular system architecture and clean component separation.`,
+      `Designed core application workflows and integrated typed interfaces to ensure reliable runtime execution.`,
+    ];
 
     return {
       repoUrl: repoData.repoUrl,
-      projectTitle: parsed.fullName || repoData.repo,
-      role: "Lead Developer / Contributor",
-      primaryTechnologies: parsed.detectedTechnologies.length > 0 ? parsed.detectedTechnologies : Object.keys(repoData.languages),
-      architectureSummary: parsed.architectureSummary || repoData.description,
+      projectTitle: finalTitle,
+      role: "Lead Developer / Creator",
+      primaryTechnologies: finalTech,
+      architectureSummary: parsed.architectureSummary || repoData.description || `Software application built with ${finalTech.join(", ")}.`,
       complexityLevel: parsed.complexityLevel === "Production-Grade" ? "Production-Grade" : parsed.complexityLevel === "High" ? "High" : "Intermediate",
       stars: repoData.stars,
-      xyzBullets: parsed.xyzBullets.length > 0 ? parsed.xyzBullets : [
-        `Engineered ${repoData.repo} utilizing ${repoData.primaryLanguage}, implementing modular system architecture and clean separation of concerns.`,
-      ],
-      atsKeywords: parsed.atsKeywords.length > 0 ? parsed.atsKeywords : Object.keys(repoData.languages),
+      xyzBullets: bullets,
+      atsKeywords: parsed.atsKeywords.length > 0 ? parsed.atsKeywords : finalTech,
       rawRepoData: {
         fullName: repoData.fullName,
         description: repoData.description,
@@ -94,29 +125,32 @@ Return a strictly valid JSON GitHubAnalysis object.`;
       },
     };
   } catch (err) {
-    console.warn("[analyzeGitHubRepository] LLM parsing failed, generating grounded heuristic analysis:", err);
+    console.warn("[analyzeGitHubRepository] LLM parsing fallback, generating grounded heuristic analysis:", err);
 
-    const detectedTech = [
-      repoData.primaryLanguage,
-      ...Object.keys(repoData.languages).slice(0, 4),
-      ...(repoData.manifestFiles.dockerfile ? ["Docker"] : []),
-      ...(repoData.manifestFiles.packageJson && repoData.manifestFiles.packageJson.includes("react") ? ["React"] : []),
-      ...(repoData.manifestFiles.packageJson && repoData.manifestFiles.packageJson.includes("next") ? ["Next.js"] : []),
-      ...(repoData.manifestFiles.requirementsTxt && repoData.manifestFiles.requirementsTxt.includes("fastapi") ? ["FastAPI"] : []),
-      ...(repoData.manifestFiles.requirementsTxt && repoData.manifestFiles.requirementsTxt.includes("torch") ? ["PyTorch"] : []),
-    ].filter((v, i, a) => a.indexOf(v) === i && Boolean(v));
+    const detectedTech = filterKeyTechnologies(
+      [
+        repoData.primaryLanguage,
+        ...Object.keys(repoData.languages).slice(0, 4),
+        ...(repoData.manifestFiles.packageJson && repoData.manifestFiles.packageJson.includes("react") ? ["React"] : []),
+        ...(repoData.manifestFiles.packageJson && repoData.manifestFiles.packageJson.includes("next") ? ["Next.js"] : []),
+        ...(repoData.manifestFiles.requirementsTxt && repoData.manifestFiles.requirementsTxt.includes("fastapi") ? ["FastAPI"] : []),
+        ...(repoData.manifestFiles.requirementsTxt && repoData.manifestFiles.requirementsTxt.includes("torch") ? ["PyTorch"] : []),
+        ...(repoData.manifestFiles.dockerfile ? ["Docker"] : []),
+      ],
+      repoData.primaryLanguage
+    );
 
     return {
       repoUrl: repoData.repoUrl,
-      projectTitle: repoData.repo.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
-      role: "Creator & Developer",
+      projectTitle: cleanTitle,
+      role: "Lead Developer / Creator",
       primaryTechnologies: detectedTech,
-      architectureSummary: repoData.description || `Software project built with ${repoData.primaryLanguage}.`,
+      architectureSummary: repoData.description || `Full-stack engineering project built with ${detectedTech.join(", ")}.`,
       complexityLevel: repoData.stars > 50 ? "Production-Grade" : "High",
       stars: repoData.stars,
       xyzBullets: [
-        `Architected and implemented ${repoData.repo} utilizing ${detectedTech.slice(0, 3).join(", ")}, establishing modular component design and typed interfaces.`,
-        `Integrated core workflows and API communications within ${repoData.primaryLanguage} environment.`,
+        `Architected and engineered ${cleanTitle} utilizing ${detectedTech.slice(0, 3).join(", ")}, establishing modular service design and structured data pipelines.`,
+        `Implemented core backend and frontend workflows with clean interface boundaries and automated build configurations.`,
       ],
       atsKeywords: detectedTech,
       rawRepoData: {

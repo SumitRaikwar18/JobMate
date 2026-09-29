@@ -85,7 +85,16 @@ import {
 } from "@/lib/ai/agents/copilot-tool-agent";
 import { subscribeCreditUpdates } from "@/lib/ai/rate-limiter";
 
+interface BuilderSearchParams {
+  template?: string | undefined;
+}
+
 export const Route = createFileRoute("/builder")({
+  validateSearch: (search: Record<string, unknown>): BuilderSearchParams => {
+    return {
+      template: typeof search["template"] === "string" ? (search["template"] as string) : undefined,
+    };
+  },
   head: () => ({
     meta: [
       { title: "Live ATS Resume Builder & AI Copilot — JobMate AI" },
@@ -252,28 +261,44 @@ const blankResumeData: ResumeDataState = {
 
 function ResumeBuilderPage() {
   const router = useRouter();
+  const search = Route.useSearch();
   const { user, profile } = useAuth();
 
   const [resumeData, setResumeData] = useState<ResumeDataState>(() => {
     if (profile) {
       return {
-        ...initialResumeData,
+        ...blankResumeData,
         personal: {
-          ...initialResumeData.personal,
-          name: profile.full_name || initialResumeData.personal.name,
-          email: profile.email || initialResumeData.personal.email,
-          targetRole: profile.target_role || initialResumeData.personal.targetRole,
-          github: profile.github_url || initialResumeData.personal.github,
-          linkedin: profile.linkedin_url || initialResumeData.personal.linkedin,
+          ...blankResumeData.personal,
+          name: profile.full_name || "",
+          email: profile.email || "",
+          targetRole: profile.target_role || "Software Engineer",
+          github: profile.github_url || "",
+          linkedin: profile.linkedin_url || "",
         },
       };
     }
-    return initialResumeData;
+    return blankResumeData;
   });
 
   const [activeResumeId, setActiveResumeId] = useState<string | null>(null);
   const [loadingResume, setLoadingResume] = useState(false);
-  const [template, setTemplate] = useState<"modern" | "classic" | "minimal" | "technical">("modern");
+  const [template, setTemplate] = useState<string>(() => (search.template as string) || "modern-clean");
+
+  useEffect(() => {
+    if (search.template && search.template !== template) {
+      setTemplate(search.template);
+      const templateNameMap: Record<string, string> = {
+        "modern-clean": "Modern Clean ATS",
+        "tech-minimalist": "Tech Minimalist",
+        "executive-pro": "Executive Pro",
+        "ivy-classic": "Ivy League Classic",
+        "ai-researcher": "AI & ML Researcher Spec",
+      };
+      const name = templateNameMap[search.template] || search.template;
+      toast.info(`Applied template: ${name}`);
+    }
+  }, [search.template]);
   
   // Left Panel Modes: Form Editor vs AI Copilot Chat (Tool-Calling)
   const [leftPanelMode, setLeftPanelMode] = useState<"form" | "copilot">("form");
@@ -426,7 +451,17 @@ function ResumeBuilderPage() {
   // Reset to Blank Resume
   const handleResetToBlank = () => {
     if (window.confirm("Are you sure you want to start with a blank resume canvas? Current unsaved entries will be cleared.")) {
-      setResumeData(blankResumeData);
+      setResumeData({
+        ...blankResumeData,
+        personal: {
+          ...blankResumeData.personal,
+          name: profile?.full_name || "",
+          email: profile?.email || "",
+          targetRole: profile?.target_role || "Software Engineer",
+          github: profile?.github_url || "",
+          linkedin: profile?.linkedin_url || "",
+        },
+      });
       setAtsAudit(null);
       toast.success("Cleared resume to blank canvas! Start typing or use AI Copilot chat.");
     }
@@ -1675,8 +1710,8 @@ function ResumeBuilderPage() {
 
           {leftPanelMode === "copilot" ? (
             /* AI Resume Copilot with Direct Tool Calling */
-            <div className="rounded-2xl border border-border bg-card p-4 shadow-xs flex-1 flex flex-col h-[740px]">
-              <div className="flex items-center justify-between pb-3 border-b border-border">
+            <div className="rounded-2xl border border-border bg-card p-4 shadow-xs flex flex-col h-[520px] lg:h-[calc(100vh-180px)] max-h-[640px] sticky top-20">
+              <div className="flex items-center justify-between pb-3 border-b border-border shrink-0">
                 <div className="flex items-center gap-2">
                   <div className="grid size-7 place-items-center rounded-lg bg-indigo-600 text-white shadow-xs">
                     <Sparkles className="size-4" />
@@ -1705,7 +1740,7 @@ function ResumeBuilderPage() {
               </div>
 
               {/* Chat Messages List */}
-              <div className="flex-1 overflow-y-auto space-y-3 py-3 pr-1 text-xs">
+              <div className="flex-1 overflow-y-auto space-y-2.5 py-3 pr-1 text-xs min-h-[140px]">
                 {copilotMessages.map((msg, idx) => (
                   <div
                     key={idx}
@@ -1746,8 +1781,8 @@ function ResumeBuilderPage() {
                 <div ref={copilotChatBottomRef} />
               </div>
 
-              {/* Quick Prompt Suggestions */}
-              <div className="pt-2 border-t border-border/60">
+              {/* Quick Prompt Suggestions & Input */}
+              <div className="pt-2 border-t border-border/60 shrink-0">
                 <p className="text-[10px] font-semibold text-muted-foreground mb-1.5">Try asking:</p>
                 <div className="flex flex-wrap gap-1.5 pb-2">
                   {[
@@ -2245,33 +2280,53 @@ function ResumeBuilderPage() {
                           size="sm"
                           variant="outline"
                           onClick={() => setIsGithubModalOpen(true)}
-                          className="gap-1 text-xs border-indigo-500/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/10 font-semibold"
+                          className="h-8 gap-1.5 rounded-lg text-xs font-semibold border-indigo-500/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/10 shadow-xs"
                         >
                           <FolderGit2 className="size-3.5" />
                           <span>Import from GitHub</span>
                         </Button>
                         <Button
                           size="sm"
-                          variant="outline"
                           onClick={() => {
                             const newProj = {
                               id: Date.now().toString(),
-                              name: "Full Stack Application",
-                              technologies: "React, Node.js, PostgreSQL",
+                              name: "New Software Project",
+                              technologies: "TypeScript, React, PostgreSQL",
                               link: "https://github.com/username/project",
-                              bullets: ["Built end-to-end full stack application with authentication and data persistence."],
+                              bullets: ["Engineered core functionality with modular architecture and automated testing."],
                             };
                             setResumeData({
                               ...resumeData,
                               projects: [newProj, ...resumeData.projects],
                             });
                           }}
-                          className="gap-1 text-xs"
+                          className="h-8 gap-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs"
                         >
-                          <Plus className="size-3.5" /> Add Project
+                          <Plus className="size-3.5" />
+                          <span>Add Project</span>
                         </Button>
                       </div>
                     </div>
+
+                    {resumeData.projects.length === 0 && (
+                      <div className="rounded-xl border border-dashed border-border p-6 text-center space-y-2.5">
+                        <FolderGit2 className="mx-auto size-7 text-muted-foreground/60" />
+                        <div>
+                          <p className="text-xs font-semibold text-foreground">No projects added yet</p>
+                          <p className="text-[11px] text-muted-foreground">Import directly from your GitHub repo or add manually.</p>
+                        </div>
+                        <div className="flex justify-center gap-2 pt-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setIsGithubModalOpen(true)}
+                            className="h-7 text-xs gap-1 text-indigo-600 border-indigo-500/30 font-semibold"
+                          >
+                            <FolderGit2 className="size-3" /> Import from GitHub
+                          </Button>
+                        </div>
+                      </div>
+                    )}
 
                     {resumeData.projects.map((proj, pIdx) => (
                   <div key={proj.id} className="rounded-xl border border-border bg-section/60 p-4 space-y-2.5">

@@ -84,20 +84,69 @@ function JobsPage() {
     missingSkills: string[];
   } | null>(null);
 
-  // Fetch Saved Jobs from Supabase
+  const [candidateSkills, setCandidateSkills] = useState<string[]>([]);
+
+  // Fetch Saved Jobs & Candidate Ground-Truth Skills from Supabase
   const fetchJobs = async () => {
     if (!user) return;
     setLoadingJobs(true);
     try {
-      const { data, error } = await supabase
-        .from("jobs")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
+      const [jobsRes, resumesRes, evidenceRes] = await Promise.all([
+        supabase
+          .from("jobs")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("resumes")
+          .select("content, resume_data")
+          .eq("user_id", user.id),
+        supabase
+          .from("candidate_evidence")
+          .select("technologies, content")
+          .eq("user_id", user.id),
+      ]);
 
-      if (data) {
-        setJobs(data as Job[]);
+      if (jobsRes.data) {
+        setJobs(jobsRes.data as Job[]);
       }
+
+      // Aggregate real ground-truth skills from user's database records
+      const extractedSkills = new Set<string>();
+
+      if (profile?.target_role) extractedSkills.add(profile.target_role);
+      if (profile?.headline) {
+        profile.headline.split(/[,|•/]/).forEach((s) => {
+          const t = s.trim();
+          if (t.length > 1) extractedSkills.add(t);
+        });
+      }
+
+      if (resumesRes.data) {
+        for (const r of resumesRes.data) {
+          const rd = (r.resume_data || r.content) as any;
+          if (rd?.skills) {
+            const lang = Array.isArray(rd.skills.languages) ? rd.skills.languages : (typeof rd.skills.languages === "string" ? rd.skills.languages.split(",") : []);
+            const fw = Array.isArray(rd.skills.frameworks) ? rd.skills.frameworks : (typeof rd.skills.frameworks === "string" ? rd.skills.frameworks.split(",") : []);
+            const tools = Array.isArray(rd.skills.tools) ? rd.skills.tools : (typeof rd.skills.tools === "string" ? rd.skills.tools.split(",") : []);
+            [...lang, ...fw, ...tools].forEach((s: string) => {
+              if (typeof s === "string") {
+                s.split(",").map((x) => x.trim()).filter(Boolean).forEach((x) => extractedSkills.add(x));
+              }
+            });
+          }
+        }
+      }
+
+      if (evidenceRes.data) {
+        for (const ev of evidenceRes.data) {
+          if (Array.isArray(ev.technologies)) {
+            ev.technologies.forEach((t: string) => extractedSkills.add(t));
+          }
+        }
+      }
+
+      setCandidateSkills(Array.from(extractedSkills));
     } catch (err) {
       console.error("Error fetching jobs:", err);
     } finally {
@@ -111,30 +160,32 @@ function JobsPage() {
     }
   }, [user]);
 
-  // Compute Gap Analysis against candidate profile
+  // Compute Ground-Truth Gap Analysis against candidate profile & evidence
   const computeMatchAndGaps = (decomposition: JobDecomposition) => {
-    const candidateSkillsString = [
-      profile?.headline || "",
-      profile?.target_role || "",
-      "TypeScript", "React", "Node.js", "Python", "SQL", "Git", "REST APIs", "Docker", "AWS", "PostgreSQL",
-    ].join(" ").toLowerCase();
-
+    const candidateSkillsLower = candidateSkills.map((s) => s.toLowerCase().trim());
     const mustHaves = decomposition.mustHaveSkills || [];
     const matched: string[] = [];
     const missing: string[] = [];
 
-    mustHaves.forEach((skill) => {
-      const cleanSkill = skill.toLowerCase().trim();
-      if (candidateSkillsString.includes(cleanSkill) || cleanSkill.split(" ").some((w) => candidateSkillsString.includes(w) && w.length > 2)) {
-        matched.push(skill);
+    if (mustHaves.length === 0) {
+      return { score: candidateSkills.length > 0 ? 100 : 0, matched: [], missing: [] };
+    }
+
+    mustHaves.forEach((reqSkill) => {
+      const cleanReq = reqSkill.toLowerCase().trim();
+      const isMatched = candidateSkillsLower.some(
+        (candSkill) => candSkill.includes(cleanReq) || cleanReq.includes(candSkill)
+      );
+      if (isMatched) {
+        matched.push(reqSkill);
       } else {
-        missing.push(skill);
+        missing.push(reqSkill);
       }
     });
 
-    const totalSkills = Math.max(1, mustHaves.length);
-    const score = Math.round((matched.length / totalSkills) * 40 + 55);
-    return { score: Math.min(98, score), matched, missing };
+    const matchRatio = matched.length / mustHaves.length;
+    const score = Math.round(matchRatio * 100);
+    return { score, matched, missing };
   };
 
   const handleScrapeAndAnalyzeUrl = async (e: React.FormEvent) => {
