@@ -14,11 +14,11 @@ import { createClient } from "@supabase/supabase-js";
 import { checkAndConsumeAiQuota, getAiQuotaStatus } from "../lib/ai/rate-limiter";
 
 // Configuration from Environment Variables
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
-const PORT = process.env.PORT || 8080;
+const TELEGRAM_BOT_TOKEN = process.env["TELEGRAM_BOT_TOKEN"] || "";
+const SUPABASE_URL = process.env["VITE_SUPABASE_URL"] || process.env["SUPABASE_URL"] || "";
+const SUPABASE_KEY = process.env["SUPABASE_SERVICE_ROLE_KEY"] || process.env["VITE_SUPABASE_ANON_KEY"] || "";
+const OPENROUTER_API_KEY = process.env["OPENROUTER_API_KEY"] || "";
+const PORT = process.env["PORT"] || 8080;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 

@@ -43,13 +43,16 @@ export const fetchGitHubRepoServerFn = createServerFn({ method: "POST" })
     }
 
     const [owner, repo] = parts;
+    if (!owner || !repo) {
+      throw new Error("Invalid GitHub repository format. Expected 'owner/repo' or full GitHub URL.");
+    }
     const headers: Record<string, string> = {
       "Accept": "application/vnd.github.v3+json",
       "User-Agent": "JobMate-AI-Agent",
     };
 
     // If GITHUB_TOKEN is available in env, use it to bypass unauthenticated rate limits (60 req/hr -> 5000 req/hr)
-    const githubToken = process.env.GITHUB_TOKEN || process.env.VITE_GITHUB_TOKEN;
+    const githubToken = process.env["GITHUB_TOKEN"] || process.env["VITE_GITHUB_TOKEN"];
     if (githubToken) {
       headers["Authorization"] = `Bearer ${githubToken.trim()}`;
     }

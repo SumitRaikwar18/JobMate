@@ -5,8 +5,8 @@ export interface ScrapedJobPosting {
   company: string;
   description: string;
   url: string;
-  location?: string;
-  salaryRange?: string;
+  location?: string | undefined;
+  salaryRange?: string | undefined;
   source: "greenhouse" | "lever" | "linkedin" | "indeed" | "ashby" | "workday" | "generic";
 }
 
@@ -122,7 +122,8 @@ function extractFallbackCompany(html: string): string {
   if (titleMatch && titleMatch[1]) {
     const parts = titleMatch[1].split(/[-|–]/);
     if (parts.length > 1) {
-      return parts[parts.length - 1].trim();
+      const lastPart = parts[parts.length - 1];
+      if (lastPart) return lastPart.trim();
     }
   }
 

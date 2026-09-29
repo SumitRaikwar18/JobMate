@@ -35,7 +35,7 @@ export interface RateLimitCheckResult {
 }
 
 function getTodayDateString(): string {
-  return new Date().toISOString().split("T")[0];
+  return new Date().toISOString().slice(0, 10);
 }
 
 function getNextMidnight(): Date {

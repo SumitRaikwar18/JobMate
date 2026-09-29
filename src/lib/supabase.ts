@@ -1,7 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "";
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
+const supabaseUrl = (import.meta.env["VITE_SUPABASE_URL"] as string) || "";
+const supabaseAnonKey = (import.meta.env["VITE_SUPABASE_ANON_KEY"] as string) || "";
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
@@ -27,9 +27,9 @@ export type UserProfile = {
   phone: string | null;
   location: string | null;
   bio: string | null;
-  daily_ai_requests_count?: number;
-  last_ai_request_date?: string;
-  plan_tier?: "free" | "pro";
+  daily_ai_requests_count?: number | undefined;
+  last_ai_request_date?: string | undefined;
+  plan_tier?: "free" | "pro" | undefined;
   created_at: string;
   updated_at: string;
 };
@@ -45,6 +45,7 @@ export type Resume = {
   ats_score: number;
   ats_feedback: any;
   resume_data: any;
+  content?: any;
   is_primary: boolean;
   created_at: string;
   updated_at: string;
@@ -60,6 +61,9 @@ export type Job = {
   description: string;
   required_skills: string[] | null;
   match_score: number;
+  ats_match_score?: number | null | undefined;
+  salary_range?: string | null | undefined;
+  notes?: string | null | undefined;
   match_details: any;
   status: string;
   url: string | null;
