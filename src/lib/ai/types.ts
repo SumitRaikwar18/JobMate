@@ -7,13 +7,14 @@ export interface CandidateEvidenceItem {
   id: string;
   category: "experience" | "project" | "education" | "skill" | "certification";
   title: string;
-  organization?: string;
-  startDate?: string;
-  endDate?: string;
+  organization?: string | undefined;
+  startDate?: string | undefined;
+  endDate?: string | undefined;
+  dateRange?: string | undefined;
   verifiedClaims: string[];
   metrics: string[];
   technologiesUsed: string[];
-  sourceUrl?: string;
+  sourceUrl?: string | undefined;
 }
 
 export interface CandidateEvidenceBank {
@@ -47,11 +48,11 @@ export interface GeneratedResumeSection {
   sectionTitle: string;
   items: Array<{
     title: string;
-    subtitle?: string;
-    dateRange?: string;
-    location?: string;
+    subtitle?: string | undefined;
+    dateRange?: string | undefined;
+    location?: string | undefined;
     bullets: string[];
-    evidenceSourceId?: string;
+    evidenceSourceId?: string | undefined;
   }>;
 }
 
@@ -90,10 +91,10 @@ export interface AgentExecutionStep {
   agentName: "JD_Analyzer" | "Evidence_Retriever" | "Resume_Planner" | "XYZ_Synthesizer" | "Critic_Guardrail" | "ATS_Auditor";
   displayName: string;
   status: AgentPipelineStepStatus;
-  startedAt?: string;
-  finishedAt?: string;
-  outputSummary?: string;
-  reflectionCount?: number;
+  startedAt?: string | undefined;
+  finishedAt?: string | undefined;
+  outputSummary?: string | undefined;
+  reflectionCount?: number | undefined;
 }
 
 export interface MultiAgentPipelineResult {
