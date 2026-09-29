@@ -6,8 +6,11 @@ import {
   Check,
   CheckCircle2,
   Clock3,
+  Cpu,
   FileCheck2,
+  FileCode,
   FileText,
+  FolderGit2,
   LayoutDashboard,
   LockKeyhole,
   Menu,
@@ -141,20 +144,20 @@ function Hero() {
         {/* Top Floating Pill Badge */}
         <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-soft-blue/80 px-3.5 py-1 text-xs font-semibold text-primary shadow-xs backdrop-blur-sm">
           <Sparkles className="size-3.5 text-primary" />
-          <span>AI-Powered Career & Resume Platform</span>
+          <span>Evidence-Grounded AI Career Intelligence Engine</span>
         </div>
 
         {/* Catchy Centered Headline */}
         <h1 className="mt-5 text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl lg:text-6xl sm:leading-[1.12]">
-          Build Your ATS-Optimized Resume{" "}
+          Turn Your Real Engineering Work Into{" "}
           <span className="block mt-1.5 bg-gradient-to-r from-primary via-blue-600 to-indigo-600 bg-clip-text text-transparent">
-            Tailored to Any Job in Minutes
+            Evidence-Backed Job Applications
           </span>
         </h1>
 
         {/* Subtitle */}
         <p className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-          Transform your career journey with AI. Instantly match job descriptions, optimize ATS keywords, and create recruiter-approved resumes through our web dashboard or mobile Telegram bot.
+          Decompose job descriptions, retrieve candidate ground-truth code & project evidence with pgvector hybrid search, and generate verifiable Google XYZ resume bullets backed by deterministic claim provenance.
         </p>
 
         {/* Action Buttons */}
@@ -163,31 +166,29 @@ function Hero() {
             to="/builder"
             className={cn(buttonVariants({ variant: "primary", size: "lg" }), "w-full sm:w-auto shadow-button hover:shadow-button-hover")}
           >
-            Start Building Free <ArrowRight className="size-4" />
+            Launch Multi-Agent Tailor <ArrowRight className="size-4" />
           </Link>
-          <a
-            href={telegramUrl}
-            target="_blank"
-            rel="noreferrer"
+          <Link
+            to="/jobs"
             className={cn(buttonVariants({ variant: "outline", size: "lg" }), "w-full sm:w-auto")}
           >
-            <Send className="size-4 text-[#229ED9]" /> Try on Telegram
-          </a>
+            <ShieldCheck className="size-4 text-emerald-500" /> Inspect Evidence Grounding
+          </Link>
         </div>
 
         {/* Trust & Highlight Badges */}
         <div className="mt-10 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-xs text-muted-foreground sm:text-sm">
           <span className="flex items-center gap-1.5 font-medium">
-            <ShieldCheck className="size-4 text-primary" /> 99% ATS Pass Rate
+            <ShieldCheck className="size-4 text-emerald-500" /> Evidence-Grounded Verification
           </span>
           <span className="flex items-center gap-1.5 font-medium">
-            <Zap className="size-4 text-primary" /> 100% Free to Start
+            <Zap className="size-4 text-primary" /> pgvector Hybrid RAG (88.9% Recall@5)
           </span>
           <span className="flex items-center gap-1.5 font-medium">
-            <Bot className="size-4 text-primary" /> Web & Telegram Sync
+            <Cpu className="size-4 text-indigo-500" /> 6-Agent StateGraph DAG
           </span>
           <span className="flex items-center gap-1.5 font-medium">
-            <Clock3 className="size-4 text-primary" /> Ready in 2 Minutes
+            <FileCode className="size-4 text-primary" /> Deterministic LaTeX Engine
           </span>
         </div>
       </div>
@@ -198,24 +199,31 @@ function Hero() {
 const features = [
   {
     icon: Target,
-    badge: "AI Matching",
-    title: "AI-Powered & Smart",
-    description: "Get tailored bullet points and keyword recommendations customized for your target job description and skill profile.",
-    perk: "Smart keyword auto-extraction",
+    badge: "pgvector RAG",
+    title: "Hybrid Evidence Retrieval",
+    description: "Combines dense vector cosine similarity (text-embedding-3-small) with BM25 lexical search and skill taxonomy boosting to ground every bullet.",
+    perk: "Exact source citation & attribution",
+  },
+  {
+    icon: FolderGit2,
+    badge: "AST Parser",
+    title: "GitHub Code Intelligence",
+    description: "Parses package.json dependencies, Dockerfiles, and repository structures into quantifiable Google XYZ accomplishment bullets.",
+    perk: "AST-backed technical proof",
   },
   {
     icon: ShieldCheck,
-    badge: "99% ATS Pass",
-    title: "ATS Optimized",
-    description: "Clean, machine-readable structures formatted to breeze through Applicant Tracking Systems like Greenhouse, Lever & Workday.",
-    perk: "Zero formatting or parse errors",
+    badge: "Adversarial Critic",
+    title: "Anti-Hallucination Guardrails",
+    description: "Evaluates every generated bullet against candidate ground truth with active reflection loops, rejecting fabricated companies or metrics.",
+    perk: "Deterministic verification passes",
   },
   {
-    icon: MessageCircle,
-    badge: "Web & Telegram",
-    title: "Chat With JobMate",
-    description: "Create, revise, and polish your resume seamlessly through natural chat on our web dashboard or mobile Telegram bot.",
-    perk: "24/7 AI Career Assistant",
+    icon: FileCode,
+    badge: "Single-Column LaTeX",
+    title: "Deterministic ATS Export",
+    description: "Compiles single-column ATS-first LaTeX source (.tex) fully compliant with Overleaf, pdflatex, and enterprise ATS parsing engines.",
+    perk: "Zero layout corruption",
   },
   {
     icon: CheckCircle2,

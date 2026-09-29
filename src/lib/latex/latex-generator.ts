@@ -7,57 +7,58 @@
 export interface LatexResumeInput {
   personal: {
     name: string;
-    headline?: string;
+    headline?: string | undefined;
     email: string;
-    phone?: string;
-    location?: string;
-    targetRole?: string;
-    linkedin?: string;
-    github?: string;
-    portfolio?: string;
+    phone?: string | undefined;
+    location?: string | undefined;
+    targetRole?: string | undefined;
+    linkedin?: string | undefined;
+    github?: string | undefined;
+    portfolio?: string | undefined;
   };
-  summary?: string;
+  summary?: string | undefined;
   skills: {
-    languages?: string[];
-    frameworks?: string[];
-    tools?: string[];
-    softSkills?: string[];
-    aiSkills?: string[];
-    backendSkills?: string[];
-    dataSkills?: string[];
-    frontendSkills?: string[];
-    reliabilitySkills?: string[];
+    languages?: string[] | undefined;
+    frameworks?: string[] | undefined;
+    tools?: string[] | undefined;
+    softSkills?: string[] | undefined;
+    aiSkills?: string[] | undefined;
+    backendSkills?: string[] | undefined;
+    dataSkills?: string[] | undefined;
+    frontendSkills?: string[] | undefined;
+    reliabilitySkills?: string[] | undefined;
   };
   experiences?: Array<{
     id: string;
     role: string;
     company: string;
-    location?: string;
+    location?: string | undefined;
     startDate: string;
     endDate: string;
-    current?: boolean;
+    current?: boolean | undefined;
     bullets: string[];
-  }>;
+  }> | undefined;
   projects?: Array<{
     id: string;
     name: string;
-    subtitle?: string;
-    technologies?: string;
-    githubLink?: string;
-    liveLink?: string;
-    link?: string;
+    subtitle?: string | undefined;
+    technologies?: string | undefined;
+    githubLink?: string | undefined;
+    liveLink?: string | undefined;
+    link?: string | undefined;
     bullets: string[];
-  }>;
+  }> | undefined;
   education?: Array<{
     id: string;
     degree: string;
     institution: string;
-    location?: string;
-    startDate?: string;
+    location?: string | undefined;
+    startDate?: string | undefined;
     endDate: string;
-    score?: string;
-  }>;
-  achievements?: string[];
+    score?: string | undefined;
+  }> | undefined;
+  achievements?: string[] | undefined;
+  templateId?: string | undefined;
 }
 
 /**

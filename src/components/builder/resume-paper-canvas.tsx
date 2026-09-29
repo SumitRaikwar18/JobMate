@@ -24,7 +24,7 @@ interface ResumePaperCanvasProps {
   resumeData: ResumeDataState;
   template: "modern" | "classic" | "minimal" | "technical";
   onTemplateChange: (template: "modern" | "classic" | "minimal" | "technical") => void;
-  atsScore?: number;
+  atsScore?: number | undefined;
 }
 
 export function ResumePaperCanvas({
@@ -51,8 +51,8 @@ export function ResumePaperCanvas({
   }, [resumeData, template]);
 
   const latexSource = React.useMemo(() => {
-    return generateLatexResumeSource(resumeData as any, template === "classic" ? "classic" : "modern");
-  }, [resumeData, template]);
+    return generateLatexResumeSource(resumeData as any);
+  }, [resumeData]);
 
   const handlePrint = () => {
     window.print();

@@ -69,7 +69,7 @@ export function AppLayout({ children, activeNav }: AppLayoutProps) {
         remaining,
       }));
     } else {
-      setQuota(getAiQuotaStatus(user?.id || "local-user", (profile?.plan_tier as any) || "free"));
+      setQuota(getAiQuotaStatus(user?.id || "local-user", "free"));
     }
 
     const unsubscribe = subscribeCreditUpdates(({ remaining, limit }) => {
@@ -145,7 +145,7 @@ export function AppLayout({ children, activeNav }: AppLayoutProps) {
     router.navigate({ to: "/" });
   };
 
-  const displayName = profile?.full_name || user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Candidate";
+  const displayName = profile?.full_name || (user?.user_metadata as any)?.["full_name"] || user?.email?.split("@")[0] || "Candidate";
   const userInitials = displayName.split(" ").map((n: string) => n[0]).join("").substring(0, 2).toUpperCase() || "SR";
   const unreadCount = notifications.filter((n) => !n.read).length;
 
