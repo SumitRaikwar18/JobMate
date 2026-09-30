@@ -105,8 +105,8 @@ export async function fetchUserCandidateEvidence(userId: string): Promise<Eviden
       technologies: row.technologies || [],
       concepts: row.concepts || [],
       metrics: row.metrics || [],
-      verified: row.verified ?? true,
-      confidence: row.confidence ?? 1.0,
+      verified: row.verified ?? false,
+      confidence: row.confidence ?? 0.5,
       metadata: {
         ...(row.metadata || {}),
         embedding: row.embedding,

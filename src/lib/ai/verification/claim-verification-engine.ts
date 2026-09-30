@@ -158,13 +158,14 @@ Extract all atomic facts.`;
         (f) => f.category === "technology_usage" && f.status === "unsupported"
       ).length;
 
-      let claimStatus: CandidateClaim["status"] = "verified";
+      const verifiedCountInClaim = verifiedFacts.filter((f) => f.status === "verified").length;
+      let claimStatus: CandidateClaim["status"] = (verifiedFacts.length > 0 && verifiedCountInClaim === verifiedFacts.length) ? "verified" : "partially_verified";
       if (hasUnsupportedMetric) {
         claimStatus = "blocked";
         unsupportedMetrics++;
         blockedClaims++;
         failureReasons.push(`Blocked unproven metric assertion in statement: "${statement.slice(0, 80)}..."`);
-      } else if (unverifiedTechCount > 0) {
+      } else if (unverifiedTechCount > 0 || verifiedFacts.length === 0) {
         claimStatus = "partially_verified";
       }
 

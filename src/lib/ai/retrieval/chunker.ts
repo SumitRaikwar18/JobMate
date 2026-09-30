@@ -78,6 +78,7 @@ export function chunkDocument(doc: RawDocumentInput, options: ChunkOptions = {})
   if (text.length <= maxChunkSize) {
     const technologies = extractTechnologiesFromText(text);
     const metrics = extractMetricsFromText(text);
+    const baseConfidence = doc.sourceType === "github" ? 0.75 : doc.sourceType === "project" ? 0.6 : 0.5;
 
     return [
       {
@@ -91,8 +92,8 @@ export function chunkDocument(doc: RawDocumentInput, options: ChunkOptions = {})
         technologies,
         concepts: [],
         metrics,
-        verified: true,
-        confidence: 1.0,
+        verified: false,
+        confidence: baseConfidence,
         metadata: doc.metadata || {},
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -104,6 +105,7 @@ export function chunkDocument(doc: RawDocumentInput, options: ChunkOptions = {})
   const sections = text.split(/\n\s*\n|(?:\r?\n)(?=[•\-\*]|\d+\.)/);
   const chunks: EvidenceItem[] = [];
   let currentBuffer = "";
+  const baseConfidence = doc.sourceType === "github" ? 0.75 : doc.sourceType === "project" ? 0.6 : 0.5;
 
   for (const section of sections) {
     const trimmed = section.trim();
@@ -126,8 +128,8 @@ export function chunkDocument(doc: RawDocumentInput, options: ChunkOptions = {})
           technologies,
           concepts: [],
           metrics,
-          verified: true,
-          confidence: 1.0,
+          verified: false,
+          confidence: baseConfidence,
           metadata: doc.metadata || {},
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -154,8 +156,8 @@ export function chunkDocument(doc: RawDocumentInput, options: ChunkOptions = {})
               technologies,
               concepts: [],
               metrics,
-              verified: true,
-              confidence: 1.0,
+              verified: false,
+              confidence: baseConfidence,
               metadata: doc.metadata || {},
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
@@ -184,8 +186,8 @@ export function chunkDocument(doc: RawDocumentInput, options: ChunkOptions = {})
       technologies,
       concepts: [],
       metrics,
-      verified: true,
-      confidence: 1.0,
+      verified: false,
+      confidence: baseConfidence,
       metadata: doc.metadata || {},
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

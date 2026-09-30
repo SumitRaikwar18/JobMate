@@ -1,7 +1,12 @@
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = (import.meta.env["VITE_SUPABASE_URL"] as string) || "";
-const supabaseAnonKey = (import.meta.env["VITE_SUPABASE_ANON_KEY"] as string) || "";
+const env: Record<string, string | undefined> = 
+  (typeof import.meta !== "undefined" && (import.meta as any).env)
+    ? (import.meta as any).env
+    : (typeof process !== "undefined" && process.env ? (process.env as any) : {});
+
+const supabaseUrl = (env["VITE_SUPABASE_URL"] as string) || "https://placeholder-jobmate.supabase.co";
+const supabaseAnonKey = (env["VITE_SUPABASE_ANON_KEY"] as string) || "placeholder-anon-key";
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {

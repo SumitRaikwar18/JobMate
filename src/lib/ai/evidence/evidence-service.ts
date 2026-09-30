@@ -28,6 +28,23 @@ export class EvidenceService {
   }
 
   /**
+   * Deterministic Temporal Freshness Evaluator
+   * Fresh: <= 18 months
+   * Aging: 18 months - 36 months
+   * Stale: > 36 months (3 years)
+   */
+  public static evaluateFreshness(observedDate?: string): "FRESH" | "AGING" | "STALE" {
+    if (!observedDate) return "FRESH";
+    const date = new Date(observedDate);
+    if (isNaN(date.getTime())) return "FRESH";
+
+    const ageInMonths = (Date.now() - date.getTime()) / (1000 * 60 * 60 * 24 * 30.4375);
+    if (ageInMonths > 36) return "STALE";
+    if (ageInMonths > 18) return "AGING";
+    return "FRESH";
+  }
+
+  /**
    * Deterministic SHA-256 or string hash for idempotent deduplication
    */
   public static computeContentHash(content: string, repo: string = "", path: string = ""): string {

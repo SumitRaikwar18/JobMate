@@ -177,18 +177,18 @@ export class ResumeStateGraph {
     await this.updateStep("Evidence_Retriever" as any, "pgvector Hybrid RAG & Reranker", "running", "Executing dense cosine similarity + BM25 sparse search + reranking...");
 
     // Convert candidate evidence bank items into EvidenceItem format
-    const evidencePool: EvidenceItem[] = (this.state.evidenceBank.evidenceItems || []).map((item) => ({
+    const evidencePool: EvidenceItem[] = (this.state.evidenceBank.evidenceItems || []).map((item: any) => ({
       id: item.id,
       candidateId: this.state.candidateId,
-      sourceType: item.category as any,
+      sourceType: (item.category || item.sourceType || "experience") as any,
       title: item.title,
-      content: `${item.title} at ${item.organization || "Company"}. ${item.verifiedClaims.join(" ")}`,
-      technologies: item.technologiesUsed || [],
-      concepts: [],
-      metrics: item.metrics.map((m) => ({ metricName: "metric", metricValue: m })),
-      verified: true,
-      confidence: 1.0,
-      metadata: {},
+      content: `${item.title} at ${item.organization || "Company"}. ${(item.verifiedClaims || []).join(" ")}`,
+      technologies: item.technologiesUsed || item.technologies || [],
+      concepts: item.concepts || [],
+      metrics: (item.metrics || []).map((m: any) => typeof m === "string" ? { metricName: "metric", metricValue: m } : m),
+      verified: item.verified ?? (item.verificationStatus === "VERIFIED" || item.evidenceLevel === "L5_COMMIT_PR" || item.evidenceLevel === "L6_TEST_CI"),
+      confidence: item.confidence ?? (item.verificationStatus === "VERIFIED" ? 0.95 : 0.65),
+      metadata: item.metadata || {},
     }));
 
     const query = `${this.state.jobAnalysis.roleTitle} ${this.state.jobAnalysis.requiredHardSkills.join(" ")}`;
@@ -264,18 +264,18 @@ export class ResumeStateGraph {
     this.state.currentDraft = draft;
 
     // Convert candidate evidence items for provenance attribution
-    const evidencePool: EvidenceItem[] = (this.state.evidenceBank.evidenceItems || []).map((item) => ({
+    const evidencePool: EvidenceItem[] = (this.state.evidenceBank.evidenceItems || []).map((item: any) => ({
       id: item.id,
       candidateId: this.state.candidateId,
-      sourceType: item.category as any,
+      sourceType: (item.category || item.sourceType || "experience") as any,
       title: item.title,
-      content: `${item.title} at ${item.organization || "Company"}. ${item.verifiedClaims.join(" ")}`,
-      technologies: item.technologiesUsed || [],
-      concepts: [],
-      metrics: item.metrics.map((m) => ({ metricName: "metric", metricValue: m })),
-      verified: true,
-      confidence: 1.0,
-      metadata: {},
+      content: `${item.title} at ${item.organization || "Company"}. ${(item.verifiedClaims || []).join(" ")}`,
+      technologies: item.technologiesUsed || item.technologies || [],
+      concepts: item.concepts || [],
+      metrics: (item.metrics || []).map((m: any) => typeof m === "string" ? { metricName: "metric", metricValue: m } : m),
+      verified: item.verified ?? (item.verificationStatus === "VERIFIED" || item.evidenceLevel === "L5_COMMIT_PR" || item.evidenceLevel === "L6_TEST_CI"),
+      confidence: item.confidence ?? (item.verificationStatus === "VERIFIED" ? 0.95 : 0.65),
+      metadata: item.metadata || {},
     }));
 
     this.state.provenanceRecords = buildClaimProvenanceRecords(
