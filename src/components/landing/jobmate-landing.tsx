@@ -5,22 +5,26 @@ import {
   BriefcaseBusiness,
   Check,
   CheckCircle2,
-  Clock3,
+  ChevronRight,
+  Code2,
   Cpu,
-  FileCheck2,
+  Database,
+  ExternalLink,
   FileCode,
   FileText,
   FolderGit2,
+  GitBranch,
+  GitCommit,
+  Layers,
   LayoutDashboard,
   LockKeyhole,
   Menu,
-  MessageCircle,
-  Palette,
-  Send,
-  Settings,
+  Network,
+  ShieldAlert,
   ShieldCheck,
   Sparkles,
   Target,
+  Terminal,
   Upload,
   X,
   Zap,
@@ -32,20 +36,11 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { JobMateLogo } from "@/components/brand/jobmate-logo";
 
-const telegramUrl = "https://t.me/jobmate_bot";
-
-function Logo({ compact = false }: { compact?: boolean }) {
-  return (
-    <Link to="/" className="inline-flex shrink-0 items-center" aria-label="JobMate home">
-      <JobMateLogo size={compact ? "sm" : "md"} />
-    </Link>
-  );
-}
-
 const navItems = [
-  { label: "Home", to: "/" as const },
+  { label: "How It Works", href: "#how-it-works" },
+  { label: "Evidence Graph", href: "#evidence-graph" },
+  { label: "Capabilities", href: "#capabilities" },
   { label: "Templates", to: "/templates" as const },
-  { label: "Features", to: "/" as const, hash: "features" },
 ];
 
 function Navbar() {
@@ -53,79 +48,115 @@ function Navbar() {
   const { user } = useAuth();
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border/70 bg-background/95 backdrop-blur-md">
-      <nav className="page-shell flex h-17 items-center justify-between" aria-label="Main navigation">
-        <Logo />
-        <div className="hidden items-stretch gap-8 self-stretch md:flex">
-          {navItems.map((item, index) => (
-            <Link key={item.label} to={item.to} {...(item.hash ? { hash: item.hash } : {})} className={cn("relative flex items-center text-sm font-medium transition-colors hover:text-primary", index === 0 ? "text-primary after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:bg-primary" : "text-muted-foreground")}>
-              {item.label}
-            </Link>
+    <header className="sticky top-0 z-50 border-b border-slate-200/80 dark:border-slate-800/80 bg-white/90 dark:bg-slate-950/90 backdrop-blur-md">
+      <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex h-16 items-center justify-between" aria-label="Main navigation">
+        <Link to="/" className="inline-flex items-center" aria-label="JobMate home">
+          <JobMateLogo size="md" />
+        </Link>
+
+        {/* Desktop Nav */}
+        <div className="hidden items-center gap-8 md:flex">
+          {navItems.map((item) => (
+            item.to ? (
+              <Link
+                key={item.label}
+                to={item.to}
+                className="text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-colors"
+              >
+                {item.label}
+              </Link>
+            ) : (
+              <a
+                key={item.label}
+                href={item.href}
+                className="text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-colors"
+              >
+                {item.label}
+              </a>
+            )
           ))}
-          {user && (
-            <Link to="/dashboard" className="flex items-center text-sm font-medium text-muted-foreground hover:text-primary">
-              Dashboard
-            </Link>
-          )}
         </div>
-        <div className="hidden items-center gap-2.5 md:flex">
+
+        {/* Action Buttons */}
+        <div className="hidden items-center gap-3 md:flex">
           {user ? (
             <Link
               to="/dashboard"
-              className={cn(buttonVariants({ variant: "pill", size: "sm" }), "shadow-xs font-semibold px-4")}
+              className={cn(
+                buttonVariants({ variant: "primary" }),
+                "gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 py-2 rounded-xl shadow-xs"
+              )}
             >
-              Go to Dashboard
+              <LayoutDashboard className="size-3.5" />
+              <span>Dashboard</span>
             </Link>
           ) : (
             <>
               <Link
                 to="/login"
-                className="text-xs font-semibold text-muted-foreground hover:text-foreground px-2 py-1"
+                className="text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-indigo-600 px-3 py-2 transition-colors"
               >
                 Sign In
               </Link>
               <Link
                 to="/login"
-                className={cn(buttonVariants({ variant: "pill", size: "sm" }), "shadow-xs font-semibold px-4")}
+                className={cn(
+                  buttonVariants({ variant: "primary" }),
+                  "gap-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 font-semibold text-xs px-4 py-2 rounded-xl shadow-xs"
+                )}
               >
-                Get Started Free
+                <span>Analyze Profile</span>
+                <ArrowRight className="size-3.5" />
               </Link>
             </>
           )}
         </div>
-        <Button
-          variant="icon"
-          aria-label={open ? "Close menu" : "Open menu"}
-          aria-expanded={open}
-          onClick={() => setOpen((value) => !value)}
-          className="md:hidden"
-        >
-          {open ? <X className="size-5" /> : <Menu className="size-5" />}
-        </Button>
+
+        {/* Mobile Hamburger */}
+        <div className="flex md:hidden">
+          <button
+            type="button"
+            onClick={() => setOpen(!open)}
+            className="p-2 text-slate-600 dark:text-slate-300 hover:text-slate-900 focus:outline-none"
+            aria-label="Toggle menu"
+          >
+            {open ? <X className="size-6" /> : <Menu className="size-6" />}
+          </button>
+        </div>
       </nav>
+
+      {/* Mobile Drawer */}
       {open && (
-        <div className="border-t border-border bg-background px-4 py-4 md:hidden">
-          <div className="mx-auto flex max-w-lg flex-col gap-1">
-            {navItems.map((item) => (
+        <div className="md:hidden border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-4 pt-2 pb-6 space-y-3">
+          {navItems.map((item) => (
+            item.to ? (
               <Link
                 key={item.label}
                 to={item.to}
-                {...(item.hash ? { hash: item.hash } : {})}
                 onClick={() => setOpen(false)}
-                className="rounded-lg px-3 py-2.5 text-sm font-medium text-foreground hover:bg-accent"
+                className="block py-2 text-sm font-medium text-slate-700 dark:text-slate-200"
               >
                 {item.label}
               </Link>
-            ))}
-            <div className="mt-3 pt-3 border-t border-border/70">
-              <Link
-                to="/login"
+            ) : (
+              <a
+                key={item.label}
+                href={item.href}
                 onClick={() => setOpen(false)}
-                className={cn(buttonVariants({ variant: "primary" }), "w-full justify-center")}
+                className="block py-2 text-sm font-medium text-slate-700 dark:text-slate-200"
               >
-                Get Started Free
-              </Link>
-            </div>
+                {item.label}
+              </a>
+            )
+          ))}
+          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-2">
+            <Link
+              to={user ? "/dashboard" : "/login"}
+              onClick={() => setOpen(false)}
+              className="w-full text-center py-2.5 rounded-xl bg-indigo-600 text-white text-xs font-bold"
+            >
+              {user ? "Open Dashboard" : "Analyze My Profile"}
+            </Link>
           </div>
         </div>
       )}
@@ -133,787 +164,395 @@ function Navbar() {
   );
 }
 
-function Hero() {
-  return (
-    <section className="relative overflow-hidden bg-background pt-10 pb-16 sm:pt-14 sm:pb-20 lg:pt-14 lg:pb-24">
-      {/* Background Soft Ambient Light */}
-      <div className="pointer-events-none absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 size-[650px] rounded-full bg-soft-blue/60 blur-[110px]" />
-      <div className="pointer-events-none absolute left-1/2 top-1/4 -translate-x-1/2 size-[450px] rounded-full bg-soft-purple/40 blur-[130px]" />
-
-      <div className="page-shell relative z-10 mx-auto max-w-4xl text-center">
-        {/* Top Floating Pill Badge */}
-        <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-soft-blue/80 px-3.5 py-1 text-xs font-semibold text-primary shadow-xs backdrop-blur-sm">
-          <Sparkles className="size-3.5 text-primary" />
-          <span>Evidence-Grounded AI Career Intelligence Engine</span>
-        </div>
-
-        {/* Catchy Centered Headline */}
-        <h1 className="mt-5 text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl lg:text-6xl sm:leading-[1.12]">
-          Turn Your Real Engineering Work Into{" "}
-          <span className="block mt-1.5 bg-gradient-to-r from-primary via-blue-600 to-indigo-600 bg-clip-text text-transparent">
-            Evidence-Backed Job Applications
-          </span>
-        </h1>
-
-        {/* Subtitle */}
-        <p className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-          Decompose job descriptions, retrieve candidate ground-truth code & project evidence with pgvector hybrid search, and generate verifiable Google XYZ resume bullets backed by deterministic claim provenance.
-        </p>
-
-        {/* Action Buttons */}
-        <div className="mt-9 flex flex-col items-center justify-center gap-3.5 sm:flex-row">
-          <Link
-            to="/builder"
-            className={cn(buttonVariants({ variant: "primary", size: "lg" }), "w-full sm:w-auto shadow-button hover:shadow-button-hover")}
-          >
-            Launch Multi-Agent Tailor <ArrowRight className="size-4" />
-          </Link>
-          <Link
-            to="/jobs"
-            className={cn(buttonVariants({ variant: "outline", size: "lg" }), "w-full sm:w-auto")}
-          >
-            <ShieldCheck className="size-4 text-emerald-500" /> Inspect Evidence Grounding
-          </Link>
-        </div>
-
-        {/* Trust & Highlight Badges */}
-        <div className="mt-10 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-xs text-muted-foreground sm:text-sm">
-          <span className="flex items-center gap-1.5 font-medium">
-            <ShieldCheck className="size-4 text-emerald-500" /> Evidence-Grounded Verification
-          </span>
-          <span className="flex items-center gap-1.5 font-medium">
-            <Zap className="size-4 text-primary" /> pgvector Hybrid RAG (88.9% Recall@5)
-          </span>
-          <span className="flex items-center gap-1.5 font-medium">
-            <Cpu className="size-4 text-indigo-500" /> 6-Agent StateGraph DAG
-          </span>
-          <span className="flex items-center gap-1.5 font-medium">
-            <FileCode className="size-4 text-primary" /> Deterministic LaTeX Engine
-          </span>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-const features = [
-  {
-    icon: Target,
-    badge: "pgvector RAG",
-    title: "Hybrid Evidence Retrieval",
-    description: "Combines dense vector cosine similarity (text-embedding-3-small) with BM25 lexical search and skill taxonomy boosting to ground every bullet.",
-    perk: "Exact source citation & attribution",
-  },
-  {
-    icon: FolderGit2,
-    badge: "AST Parser",
-    title: "GitHub Code Intelligence",
-    description: "Parses package.json dependencies, Dockerfiles, and repository structures into quantifiable Google XYZ accomplishment bullets.",
-    perk: "AST-backed technical proof",
-  },
-  {
-    icon: ShieldCheck,
-    badge: "Adversarial Critic",
-    title: "Anti-Hallucination Guardrails",
-    description: "Evaluates every generated bullet against candidate ground truth with active reflection loops, rejecting fabricated companies or metrics.",
-    perk: "Deterministic verification passes",
-  },
-  {
-    icon: FileCode,
-    badge: "Single-Column LaTeX",
-    title: "Deterministic ATS Export",
-    description: "Compiles single-column ATS-first LaTeX source (.tex) fully compliant with Overleaf, pdflatex, and enterprise ATS parsing engines.",
-    perk: "Zero layout corruption",
-  },
-  {
-    icon: CheckCircle2,
-    badge: "Real-Time Audit",
-    title: "Live ATS Scoring",
-    description: "Instant score breakdown analyzing keyword density, action verbs, and formatting health before submitting your application.",
-    perk: "Instant actionable score report",
-  },
-  {
-    icon: BriefcaseBusiness,
-    badge: "Recruiter Approved",
-    title: "Professional Templates",
-    description: "Choose from Modern, Classic, Minimal, Executive, and Tech formats designed by hiring managers for real jobs.",
-    perk: "1-Click layout switching",
-  },
-  {
-    icon: Zap,
-    badge: "Zero Commitment",
-    title: "Free to Start",
-    description: "Start building, tailoring, and exporting your first resume completely free. No credit card, watermarks, or hidden paywalls.",
-    perk: "Instant PDF & DOCX export",
-  },
-];
-
-function SectionIntro({
-  badge,
-  title,
-  children,
-}: {
-  badge?: string;
-  title: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className="mx-auto max-w-2xl text-center">
-      {badge && (
-        <div className="inline-flex items-center gap-1.5 rounded-full bg-soft-blue px-3 py-1 text-xs font-semibold text-primary mb-3">
-          <Sparkles className="size-3.5" />
-          {badge}
-        </div>
-      )}
-      <h2 className="section-heading text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl lg:text-4xl">
-        {title}
-      </h2>
-      <p className="mt-3 text-sm leading-relaxed text-muted-foreground sm:text-base">
-        {children}
-      </p>
-    </div>
-  );
-}
-
-function FeatureSection() {
-  return (
-    <section id="features" className="scroll-mt-20 bg-background py-20 lg:py-24">
-      <div className="page-shell">
-        <SectionIntro
-          badge="Next-Gen Career Tools"
-          title="Why Choose JobMate?"
-        >
-          Everything you need to build an ATS-compliant resume, optimize for target roles, and get interview-ready faster.
-        </SectionIntro>
-
-        {/* Perfectly Balanced 6-Card Grid (3x2 on desktop, 2x3 on tablet, 1x6 on mobile) */}
-        <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {features.map(({ icon: Icon, badge, title, description, perk }) => (
-            <article
-              key={title}
-              className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-border/80 bg-background p-7 shadow-card transition-all duration-300 hover:-translate-y-1.5 hover:border-primary/40 hover:shadow-card-hover"
-            >
-              {/* Subtle card top glow */}
-              <div className="absolute -top-10 left-1/2 size-24 -translate-x-1/2 rounded-full bg-primary/5 blur-xl transition-all duration-300 group-hover:bg-primary/10" />
-
-              <div>
-                <div className="flex items-center justify-between">
-                  <span className="grid size-12 place-items-center rounded-xl bg-soft-blue text-primary shadow-xs transition-transform duration-300 group-hover:scale-105 group-hover:bg-primary group-hover:text-primary-foreground">
-                    <Icon className="size-5" />
-                  </span>
-                  <span className="rounded-full bg-section px-2.5 py-1 text-[11px] font-semibold text-primary">
-                    {badge}
-                  </span>
-                </div>
-
-                <h3 className="mt-5 text-lg font-bold tracking-tight text-foreground sm:text-xl">
-                  {title}
-                </h3>
-                <p className="mt-2 text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                  {description}
-                </p>
-              </div>
-
-              <div className="mt-6 flex items-center gap-2 border-t border-border/60 pt-4 text-xs font-semibold text-primary">
-                <CheckCircle2 className="size-4 shrink-0 text-success" />
-                <span>{perk}</span>
-              </div>
-            </article>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-const templatesData = [
-  {
-    name: "Modern",
-    tag: "Most Popular",
-    render: () => (
-      <div className="h-full space-y-2 p-3 text-[7px] leading-tight select-none bg-background">
-        {/* Modern Top Header Accent */}
-        <div className="border-b border-border/80 pb-1.5">
-          <div className="flex items-center justify-between">
-            <div>
-              <h4 className="text-[10px] font-bold text-foreground leading-none">Alex Jordan</h4>
-              <p className="mt-0.5 text-[7.5px] font-semibold text-primary">Senior Frontend Engineer</p>
-            </div>
-            <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[6.5px] font-bold text-primary">99% ATS</span>
-          </div>
-          <p className="mt-1 text-[6px] text-muted-foreground">San Francisco, CA • alex@jobmate.ai • github.com/alexj</p>
-        </div>
-
-        {/* Professional Summary */}
-        <div>
-          <p className="font-bold uppercase tracking-wider text-[6px] text-primary">Summary</p>
-          <p className="mt-0.5 text-[6px] text-muted-foreground leading-snug">
-            Frontend Engineer with 6+ years building high-throughput web apps, performant design systems, and seamless checkout experiences.
-          </p>
-        </div>
-
-        {/* Experience */}
-        <div className="space-y-1.5">
-          <p className="font-bold uppercase tracking-wider text-[6px] text-primary">Experience</p>
-          <div>
-            <div className="flex justify-between font-semibold text-foreground text-[7px]">
-              <span>Lead Frontend Engineer · Stripe</span>
-              <span className="text-muted-foreground text-[6px]">2022 — Present</span>
-            </div>
-            <p className="mt-0.5 text-[6px] text-muted-foreground leading-snug">
-              • Led checkout UI revamp, improving conversion rates by 18% across 1.2M daily transactions.
-            </p>
-            <p className="text-[6px] text-muted-foreground leading-snug">
-              • Reduced core web vitals LCP by 42% via lazy asset loading.
-            </p>
-          </div>
-          <div>
-            <div className="flex justify-between font-semibold text-foreground text-[7px]">
-              <span>Software Engineer · Vercel</span>
-              <span className="text-muted-foreground text-[6px]">2020 — 2022</span>
-            </div>
-            <p className="mt-0.5 text-[6px] text-muted-foreground leading-snug">
-              • Built reusable dashboard components and trimmed CI/CD build times by 35%.
-            </p>
-          </div>
-        </div>
-
-        {/* Skills Chips */}
-        <div>
-          <p className="font-bold uppercase tracking-wider text-[6px] text-primary">Core Skills</p>
-          <div className="mt-1 flex flex-wrap gap-1">
-            {["React 19", "TypeScript", "Next.js", "Tailwind CSS", "GraphQL", "Jest"].map((skill) => (
-              <span key={skill} className="rounded bg-section px-1.5 py-0.5 text-[5.5px] font-medium text-foreground border border-border/50">
-                {skill}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {/* Education */}
-        <div className="border-t border-border/60 pt-1 flex justify-between text-[6px]">
-          <span className="font-semibold text-foreground">B.S. Computer Science · UC Berkeley</span>
-          <span className="text-muted-foreground">GPA 3.9 · Honors</span>
-        </div>
-      </div>
-    ),
-  },
-  {
-    name: "Classic",
-    tag: "ATS Standard",
-    render: () => (
-      <div className="h-full space-y-2 p-3 text-[7px] leading-tight select-none font-serif bg-background">
-        {/* Centered Classic Header */}
-        <div className="text-center border-b border-foreground/30 pb-1.5">
-          <h4 className="text-[11px] font-bold tracking-widest text-foreground uppercase">Alex Jordan</h4>
-          <p className="text-[6.5px] text-muted-foreground font-sans mt-0.5">
-            alex@jobmate.ai | (555) 382-9102 | New York, NY | linkedin.com/in/alexj
-          </p>
-        </div>
-
-        {/* Summary */}
-        <div className="font-sans">
-          <p className="font-serif font-bold text-[6.5px] uppercase tracking-wider border-b border-border/70 pb-0.5 text-foreground">
-            Professional Summary
-          </p>
-          <p className="mt-0.5 text-[6px] text-muted-foreground leading-snug">
-            Strategic Product Manager with 6+ years delivering high-impact SaaS growth, cross-functional roadmap execution, and enterprise customer satisfaction.
-          </p>
-        </div>
-
-        {/* Experience */}
-        <div className="space-y-1.5 font-sans">
-          <p className="font-serif font-bold text-[6.5px] uppercase tracking-wider border-b border-border/70 pb-0.5 text-foreground">
-            Professional Experience
-          </p>
-          <div>
-            <div className="flex justify-between text-[7px] font-bold text-foreground">
-              <span>Senior Product Manager — Microsoft</span>
-              <span className="text-[6px] font-normal text-muted-foreground">2021 – Present</span>
-            </div>
-            <p className="text-[6px] text-muted-foreground mt-0.5 leading-snug">
-              • Spearheaded enterprise cloud adoption, generating $14M in net-new ARR.
-            </p>
-            <p className="text-[6px] text-muted-foreground leading-snug">
-              • Managed 18-person sprint team across engineering, design, and QA.
-            </p>
-          </div>
-          <div>
-            <div className="flex justify-between text-[7px] font-bold text-foreground">
-              <span>Associate PM — Atlassian</span>
-              <span className="text-[6px] font-normal text-muted-foreground">2018 – 2021</span>
-            </div>
-            <p className="text-[6px] text-muted-foreground mt-0.5 leading-snug">
-              • Launched Jira integrations used by over 350k active organizations worldwide.
-            </p>
-          </div>
-        </div>
-
-        {/* Skills */}
-        <div className="font-sans">
-          <p className="font-serif font-bold text-[6.5px] uppercase tracking-wider border-b border-border/70 pb-0.5 text-foreground">
-            Key Competencies
-          </p>
-          <p className="mt-0.5 text-[6px] text-muted-foreground">
-            Product Strategy • Roadmapping • Agile Scrum • User Discovery • SQL & Data Analytics
-          </p>
-        </div>
-
-        {/* Education */}
-        <div className="font-sans border-t border-border/70 pt-1 flex justify-between text-[6px]">
-          <span className="font-bold text-foreground">B.A. Economics — Columbia University</span>
-          <span className="text-muted-foreground">Magna Cum Laude</span>
-        </div>
-      </div>
-    ),
-  },
-  {
-    name: "Minimal",
-    tag: "Clean & Simple",
-    render: () => (
-      <div className="h-full space-y-2 p-3 text-[7px] leading-tight select-none bg-background">
-        {/* Minimal Swiss Header */}
-        <div>
-          <div className="flex items-baseline justify-between">
-            <h4 className="text-[11px] font-black tracking-tight text-foreground">Alex Jordan</h4>
-            <span className="text-[6px] font-mono text-muted-foreground">01 / RESUME</span>
-          </div>
-          <p className="text-[7px] font-medium text-muted-foreground mt-0.5">Senior Product Designer · San Francisco</p>
-          <div className="mt-1 h-[1px] w-full bg-foreground/15" />
-        </div>
-
-        {/* Profile */}
-        <div>
-          <p className="font-mono text-[6px] uppercase text-muted-foreground">02 / PROFILE</p>
-          <p className="mt-0.5 text-[6px] text-muted-foreground leading-snug">
-            Specializing in scalable design systems, micro-interactions, and complex enterprise software workflows.
-          </p>
-        </div>
-
-        {/* Experience */}
-        <div className="space-y-1.5">
-          <p className="font-mono text-[6px] uppercase text-muted-foreground">03 / EXPERIENCE</p>
-          <div>
-            <div className="flex justify-between text-[7px] font-bold text-foreground">
-              <span>Lead Designer · Figma</span>
-              <span className="text-[6px] font-mono text-muted-foreground">2023 — NOW</span>
-            </div>
-            <p className="mt-0.5 text-[6px] text-muted-foreground leading-snug">
-              • Redesigned real-time canvas tools used by 4M+ daily creators worldwide.
-            </p>
-          </div>
-          <div>
-            <div className="flex justify-between text-[7px] font-bold text-foreground">
-              <span>Product Designer · Linear</span>
-              <span className="text-[6px] font-mono text-muted-foreground">2021 — 2023</span>
-            </div>
-            <p className="mt-0.5 text-[6px] text-muted-foreground leading-snug">
-              • Built keyboard-first issue workflow, cutting ticket triage time by 40%.
-            </p>
-          </div>
-        </div>
-
-        {/* Expertise Grid */}
-        <div>
-          <p className="font-mono text-[6px] uppercase text-muted-foreground">04 / EXPERTISE</p>
-          <p className="mt-0.5 text-[6px] font-medium text-foreground">
-            Design Systems • User Research • Rapid Prototyping • React & CSS
-          </p>
-        </div>
-
-        {/* Education */}
-        <div className="border-t border-border/60 pt-1 flex justify-between text-[6px]">
-          <span className="font-bold text-foreground">B.Des Interactive Media</span>
-          <span className="text-muted-foreground font-mono">RISD · 2021</span>
-        </div>
-      </div>
-    ),
-  },
-  {
-    name: "Professional",
-    tag: "Executive",
-    render: () => (
-      <div className="grid h-full grid-cols-[32%_68%] overflow-hidden text-[7px] select-none bg-background">
-        {/* Left Dark Sidebar */}
-        <div className="flex flex-col justify-between bg-slate-900 p-2.5 text-white">
-          <div className="space-y-2">
-            <div>
-              <div className="grid size-6 place-items-center rounded-full bg-white/20 font-bold text-[8px]">AJ</div>
-              <h4 className="mt-1.5 text-[8px] font-bold leading-none text-white">Alex Jordan</h4>
-              <p className="text-[5.5px] text-slate-300 mt-0.5">VP of Marketing</p>
-            </div>
-
-            <div className="space-y-1 pt-1 border-t border-white/10">
-              <p className="text-[5.5px] font-bold uppercase text-blue-400">Contact</p>
-              <p className="text-[5px] text-slate-300">alex@jobmate.ai</p>
-              <p className="text-[5px] text-slate-300">(555) 234-8901</p>
-              <p className="text-[5px] text-slate-300">New York, NY</p>
-            </div>
-
-            <div className="space-y-1 pt-1 border-t border-white/10">
-              <p className="text-[5.5px] font-bold uppercase text-blue-400">Core Skills</p>
-              <div className="space-y-0.5 text-[5px] text-slate-300">
-                <p>• Growth Strategy</p>
-                <p>• Brand Positioning</p>
-                <p>• Demand Gen & P&L</p>
-                <p>• Global Expansion</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="border-t border-white/10 pt-1 text-[5px] text-slate-400">
-            MBA · Wharton School
-          </div>
-        </div>
-
-        {/* Right Content */}
-        <div className="flex flex-col justify-between p-2.5 text-foreground space-y-1.5">
-          <div>
-            <p className="text-[6px] font-bold uppercase tracking-wider text-primary">Executive Summary</p>
-            <p className="mt-0.5 text-[5.5px] text-muted-foreground leading-snug">
-              Visionary marketing executive with 10+ years driving global market expansion and scaling ARR from $12M to $90M+.
-            </p>
-          </div>
-
-          <div className="space-y-1.5">
-            <p className="text-[6px] font-bold uppercase tracking-wider text-primary">Leadership History</p>
-            <div>
-              <div className="flex justify-between text-[6.5px] font-bold text-foreground">
-                <span>VP of Growth · Datadog</span>
-                <span className="text-[5.5px] text-muted-foreground font-normal">2021—Now</span>
-              </div>
-              <p className="text-[5.5px] text-muted-foreground leading-snug mt-0.5">
-                • Built 40-person marketing unit, delivering 120% YoY organic customer growth.
-              </p>
-              <p className="text-[5.5px] text-muted-foreground leading-snug">
-                • Decreased blended customer acquisition cost (CAC) by 27%.
-              </p>
-            </div>
-            <div>
-              <div className="flex justify-between text-[6.5px] font-bold text-foreground">
-                <span>Head of Marketing · Segment</span>
-                <span className="text-[5.5px] text-muted-foreground font-normal">2017—2021</span>
-              </div>
-              <p className="text-[5.5px] text-muted-foreground leading-snug mt-0.5">
-                • Executed PLG motions generating $26M in pipeline.
-              </p>
-            </div>
-          </div>
-
-          <div className="border-t border-border/60 pt-1 flex justify-between text-[5.5px] text-muted-foreground">
-            <span>ATS Compliant Format</span>
-            <span>B.A. Economics · Harvard</span>
-          </div>
-        </div>
-      </div>
-    ),
-  },
-  {
-    name: "Creative",
-    tag: "Tech & AI",
-    render: () => (
-      <div className="h-full space-y-2 p-3 text-[7px] leading-tight select-none bg-background">
-        {/* Creative Top Gradient Bar */}
-        <div>
-          <div className="h-1 w-full rounded-full bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 mb-1.5" />
-          <div className="flex items-center justify-between">
-            <div>
-              <h4 className="text-[10px] font-black text-foreground leading-none">Alex Jordan</h4>
-              <p className="text-[7px] font-semibold text-indigo-600 mt-0.5">AI & Machine Learning Engineer</p>
-            </div>
-            <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[6px] font-bold text-indigo-600 border border-indigo-200">
-              Verified
-            </span>
-          </div>
-          <p className="text-[5.5px] text-muted-foreground mt-0.5">alex@jobmate.ai • github.com/alex-ml • San Francisco</p>
-        </div>
-
-        {/* Featured Projects */}
-        <div className="space-y-1">
-          <p className="text-[6px] font-bold uppercase tracking-wider text-indigo-600">Featured Projects</p>
-          <div className="rounded bg-section p-1.5 border border-indigo-100">
-            <div className="flex justify-between text-[6.5px] font-bold text-foreground">
-              <span>Autonomous LLM Agent Framework</span>
-              <span className="text-[5.5px] text-indigo-600 font-semibold">14k ★ GitHub</span>
-            </div>
-            <p className="text-[5.5px] text-muted-foreground mt-0.5 leading-snug">
-              • Engineered parallel agent pipeline, slashing inference latency by 45%.
-            </p>
-          </div>
-        </div>
-
-        {/* Experience */}
-        <div className="space-y-1">
-          <p className="text-[6px] font-bold uppercase tracking-wider text-indigo-600">Work Experience</p>
-          <div>
-            <div className="flex justify-between text-[6.5px] font-bold text-foreground">
-              <span>Senior AI Engineer · Anthropic</span>
-              <span className="text-[5.5px] text-muted-foreground">2023 — Now</span>
-            </div>
-            <p className="text-[5.5px] text-muted-foreground leading-snug mt-0.5">
-              • Fine-tuned multi-modal LLMs achieving 99.1% benchmark precision.
-            </p>
-          </div>
-          <div>
-            <div className="flex justify-between text-[6.5px] font-bold text-foreground">
-              <span>ML Engineer · DeepMind</span>
-              <span className="text-[5.5px] text-muted-foreground">2020 — 2023</span>
-            </div>
-            <p className="text-[5.5px] text-muted-foreground leading-snug mt-0.5">
-              • Deployed transformer inference engine scaling to 50M requests/day.
-            </p>
-          </div>
-        </div>
-
-        {/* Tech Stack Chips */}
-        <div>
-          <p className="text-[6px] font-bold uppercase tracking-wider text-indigo-600">Tech Stack</p>
-          <div className="mt-0.5 flex flex-wrap gap-1">
-            {["Python", "PyTorch", "CUDA", "FastAPI", "Docker", "vLLM"].map((tech) => (
-              <span key={tech} className="rounded bg-indigo-500/10 px-1.5 py-0.5 text-[5.5px] font-semibold text-indigo-600">
-                {tech}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {/* Education */}
-        <div className="border-t border-border/60 pt-1 flex justify-between text-[5.5px] text-muted-foreground">
-          <span className="font-semibold text-foreground">M.S. Artificial Intelligence · Stanford University</span>
-          <span>GPA 4.0</span>
-        </div>
-      </div>
-    ),
-  },
-];
-
-function TemplatesSection() {
-  return (
-    <section className="bg-section py-20 lg:py-24">
-      <div className="page-shell">
-        <SectionIntro title="Beautiful Resume Templates">
-          Choose from professional, meticulously crafted templates designed to pass ATS filters and impress recruiters.
-        </SectionIntro>
-
-        <div className="-mx-4 mt-12 flex snap-x gap-5 overflow-x-auto px-4 pb-5 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 md:grid-cols-3 lg:grid-cols-5">
-          {templatesData.map(({ name, tag, render: TemplateView }) => (
-            <article key={name} className="group w-[230px] shrink-0 snap-center sm:w-auto">
-              {/* Resume Card Container */}
-              <div className="relative aspect-[0.73] overflow-hidden rounded-xl border border-border bg-background shadow-card transition-all duration-300 group-hover:-translate-y-1.5 group-hover:border-primary/40 group-hover:shadow-card-hover">
-                {/* Template Render */}
-                <TemplateView />
-
-                {/* Subtle Hover Action Overlay */}
-                <div className="absolute inset-0 flex items-center justify-center bg-background/60 opacity-0 backdrop-blur-[2px] transition-opacity duration-200 group-hover:opacity-100">
-                  <span className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-button">
-                    Use Template
-                  </span>
-                </div>
-              </div>
-
-              {/* Template Label & Tag */}
-              <div className="mt-3 flex items-center justify-between px-1">
-                <p className="text-xs font-bold text-foreground">{name}</p>
-                <span className="rounded bg-soft-blue px-1.5 py-0.5 text-[10px] font-semibold text-primary">
-                  {tag}
-                </span>
-              </div>
-            </article>
-          ))}
-        </div>
-
-        <p className="mt-6 text-center text-xs text-muted-foreground">
-          ✨ Every template strictly follows ATS standards with clean formatting and customizable sections.
-        </p>
-      </div>
-    </section>
-  );
-}
-
-function AccessCard({ type }: { type: "dashboard" | "telegram" }) {
-  const dashboard = type === "dashboard";
-  const bullets = dashboard
-    ? [
-        "Interactive resume editor with live split-view preview",
-        "1-Click job description tailoring & keyword matching",
-        "Download ATS-optimized PDF & DOCX formats",
-        "Application tracking & multi-version management",
-      ]
-    : [
-        "Quick login with seamless phone OTP verification",
-        "Chat directly with JobMate AI assistant on mobile",
-        "Upload current resume or paste job descriptions",
-        "Instant ATS suggestions & tailored resume generation",
-      ];
+export function JobMateLanding() {
+  const { user } = useAuth();
 
   return (
-    <article className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-border bg-background shadow-card transition-all duration-300 hover:border-primary/40 hover:shadow-card-hover">
-      <div className="grid sm:grid-cols-12">
-        {/* Left Content Column */}
-        <div className="flex flex-col justify-between p-6 sm:col-span-6 sm:p-8">
-          <div>
-            <div className="flex items-center gap-2.5">
-              <span className="grid size-11 place-items-center rounded-xl bg-soft-blue text-primary shadow-xs">
-                {dashboard ? <LayoutDashboard className="size-5" /> : <Send className="size-5" />}
-              </span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-soft-blue/80 px-2.5 py-1 text-[11px] font-semibold text-primary">
-                <Sparkles className="size-3" />
-                {dashboard ? "Web Platform" : "Telegram Bot"}
-              </span>
+    <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 selection:bg-indigo-500 selection:text-white">
+      <Navbar />
+
+      {/* 1. HERO SECTION */}
+      <section className="relative overflow-hidden pt-12 pb-20 md:pt-20 md:pb-28 border-b border-slate-200/60 dark:border-slate-850">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center max-w-3xl mx-auto space-y-6">
+            {/* Eyebrow */}
+            <div className="inline-flex items-center gap-2 rounded-full border border-indigo-200/80 dark:border-indigo-900/60 bg-indigo-50/80 dark:bg-indigo-950/40 px-3.5 py-1 text-xs font-semibold text-indigo-700 dark:text-indigo-300 shadow-2xs">
+              <ShieldCheck className="size-3.5 text-indigo-600 dark:text-indigo-400" />
+              <span>EVIDENCE-GROUNDED CAREER INTELLIGENCE</span>
             </div>
 
-            <h3 className="mt-4 text-xl font-bold tracking-tight text-foreground">
-              {dashboard ? "Web Dashboard" : "Telegram Assistant"}
-            </h3>
-            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              {dashboard
-                ? "Full control with a clean, powerful and minimal interface."
-                : "Chat with JobMate anytime, anywhere right from Telegram."}
+            {/* Headline */}
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-slate-900 dark:text-white leading-[1.12]">
+              Your skills are only as strong as the <span className="bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-600 bg-clip-text text-transparent">proof behind them.</span>
+            </h1>
+
+            {/* Supporting Subtext */}
+            <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 leading-relaxed max-w-2xl mx-auto font-normal">
+              JobMate connects directly to your GitHub repositories, AST syntax trees, commits, CI test suites, and project artifacts — mapping verified engineering proof to target job requirements without hallucinating fake claims.
             </p>
 
-            <ul className="mt-5 space-y-2">
-              {bullets.map((bullet) => (
-                <li key={bullet} className="flex items-start gap-2 text-xs text-muted-foreground">
-                  <span className="mt-0.5 grid size-3.5 shrink-0 place-items-center rounded-full bg-soft-blue text-primary">
-                    <Check className="size-2.5 stroke-[2.5]" />
-                  </span>
-                  <span>{bullet}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="mt-6 pt-1">
-            {dashboard ? (
-              <Link to="/dashboard" className={cn(buttonVariants({ variant: "primary" }), "w-full justify-center sm:w-auto")}>
-                Go to Dashboard <ArrowRight className="size-4" />
+            {/* CTA Buttons */}
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+              <Link
+                to={user ? "/dashboard" : "/login"}
+                className={cn(
+                  buttonVariants({ variant: "primary" }),
+                  "w-full sm:w-auto gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm px-6 py-3.5 rounded-xl shadow-md shadow-indigo-600/20 transition-all hover:scale-[1.02]"
+                )}
+              >
+                <span>Analyze My Profile</span>
+                <ArrowRight className="size-4" />
               </Link>
-            ) : (
-              <a href={telegramUrl} target="_blank" rel="noreferrer" className={cn(buttonVariants({ variant: "primary" }), "w-full justify-center sm:w-auto")}>
-                Start on Telegram <ArrowRight className="size-4" />
+              <a
+                href="#how-it-works"
+                className={cn(
+                  buttonVariants({ variant: "outline" }),
+                  "w-full sm:w-auto text-sm font-semibold text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900 px-6 py-3.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-850 transition-colors"
+                )}
+              >
+                See How It Works
               </a>
-            )}
+            </div>
+
+            {/* Micro proof badges */}
+            <div className="pt-4 flex flex-wrap items-center justify-center gap-6 text-xs font-medium text-slate-500 dark:text-slate-400">
+              <span className="flex items-center gap-1.5">
+                <Check className="size-3.5 text-emerald-600" />
+                6-Language AST Code Intelligence
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Check className="size-3.5 text-emerald-600" />
+                Deterministic Single-Column LaTeX
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Check className="size-3.5 text-emerald-600" />
+                100% Truth-Grounded Claim Verification
+              </span>
+            </div>
           </div>
-        </div>
 
-        {/* Right Visual Column (Clean Minimalist Native UI Mockup) */}
-        <div className="flex items-center justify-center bg-section/70 p-5 sm:col-span-6 sm:p-6">
-          {dashboard ? (
-            /* Minimalist Dashboard Preview */
-            <div className="w-full space-y-2.5 rounded-xl border border-border bg-background p-4 shadow-sm select-none">
-              <div className="flex items-center justify-between border-b border-border/70 pb-2">
-                <div className="flex items-center gap-1.5">
-                  <span className="size-2 rounded-full bg-success animate-pulse" />
-                  <span className="text-[10px] font-bold text-foreground">AI Resume Editor</span>
-                </div>
-                <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold text-primary">
-                  98% ATS Match
-                </span>
+          {/* Hero Visual: Interactive Evidence Graph Preview */}
+          <div className="mt-14 max-w-5xl mx-auto rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl shadow-slate-200/50 dark:shadow-none overflow-hidden">
+            <div className="border-b border-slate-200/80 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-4 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="size-3 rounded-full bg-rose-400/80" />
+                <div className="size-3 rounded-full bg-amber-400/80" />
+                <div className="size-3 rounded-full bg-emerald-400/80" />
+                <span className="ml-2 font-mono text-xs text-slate-500 dark:text-slate-400">jobmate://evidence-graph/inspect</span>
               </div>
-
-              {/* Progress & Quick Stats */}
-              <div className="grid grid-cols-2 gap-2">
-                <div className="rounded-lg bg-section p-2">
-                  <p className="text-[8px] text-muted-foreground">Target Role</p>
-                  <p className="text-[10px] font-bold text-foreground truncate">Senior Software Eng</p>
-                </div>
-                <div className="rounded-lg bg-soft-blue/60 p-2">
-                  <p className="text-[8px] text-primary">Keywords Matched</p>
-                  <p className="text-[10px] font-bold text-primary">18 / 18 Found</p>
-                </div>
-              </div>
-
-              {/* Real-time AI Suggestion */}
-              <div className="rounded-lg border border-primary/20 bg-primary/5 p-2 text-[9px] text-primary">
-                <div className="flex items-center gap-1 font-semibold">
-                  <Sparkles className="size-3" />
-                  <span>AI Recommendation Applied</span>
-                </div>
-                <p className="mt-0.5 text-[8px] text-muted-foreground leading-snug">
-                  Added high-impact action verbs and quantified accomplishments for 25% higher callback rate.
-                </p>
-              </div>
-
-              {/* Action Bar */}
-              <div className="flex items-center justify-between pt-1">
-                <span className="text-[8px] text-muted-foreground">Version: v2.4 (Saved)</span>
-                <span className="rounded-md bg-primary px-2 py-1 text-[8px] font-semibold text-primary-foreground">
-                  1-Click Tailor
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-400 border border-emerald-200/60">
+                  <ShieldCheck className="size-3" /> VERIFIED PROVENANCE
                 </span>
               </div>
             </div>
-          ) : (
-            /* Minimalist Telegram Bot Chat Widget */
-            <div className="w-full space-y-2.5 rounded-xl border border-border bg-background p-4 shadow-sm select-none">
-              {/* Telegram Header */}
-              <div className="flex items-center gap-2 border-b border-border/70 pb-2">
-                <span className="grid size-6 place-items-center rounded-full bg-[#229ED9] text-white">
-                  <Send className="size-3" />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-[10px] font-bold text-foreground">JobMate AI Bot</p>
-                  <p className="text-[7.5px] text-success flex items-center gap-1">
-                    <span className="size-1 rounded-full bg-success" /> online
-                  </p>
+
+            <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
+              {/* Node 1: Code Artifact */}
+              <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">01. Source Code AST</span>
+                  <span className="font-mono text-[10px] text-indigo-600 bg-indigo-50 dark:bg-indigo-950/80 px-1.5 py-0.5 rounded">L4_SOURCE</span>
                 </div>
+                <div className="font-mono text-xs text-slate-800 dark:text-slate-200 space-y-1 bg-white dark:bg-slate-900 p-2.5 rounded-lg border border-slate-200/60 dark:border-slate-800">
+                  <p className="text-slate-400 text-[10px]">// src/api/users.ts:L14-L38</p>
+                  <p><span className="text-indigo-600 dark:text-indigo-400 font-bold">export async function</span> createUser(req) &#123;</p>
+                  <p className="pl-3 text-slate-500">supabase.from("users").insert(..)</p>
+                  <p>&#125;</p>
+                </div>
+                <p className="text-xs text-slate-500">AST identified exported HTTP handler & Supabase client integration.</p>
               </div>
 
-              {/* Chat Bubble: User */}
-              <div className="flex justify-end">
-                <div className="max-w-[85%] rounded-lg rounded-br-none bg-primary px-2.5 py-1.5 text-[8.5px] leading-relaxed text-primary-foreground">
-                  Tailor my resume for Product Manager at Stripe 🚀
+              {/* Node 2: Evidence Graph Node */}
+              <div className="rounded-xl border border-indigo-200 dark:border-indigo-900 bg-indigo-50/20 dark:bg-indigo-950/20 p-4 space-y-3 relative">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">02. Evidence Node</span>
+                  <span className="font-mono text-[10px] text-emerald-600 bg-emerald-50 dark:bg-emerald-950/80 px-1.5 py-0.5 rounded">95% Conf</span>
                 </div>
-              </div>
-
-              {/* Chat Bubble: Bot Response */}
-              <div className="flex justify-start">
-                <div className="max-w-[90%] rounded-lg rounded-bl-none bg-section px-2.5 py-1.5 text-[8.5px] leading-relaxed text-foreground shadow-xs">
-                  <p className="font-semibold text-primary text-[8px] flex items-center gap-1">
-                    <Sparkles className="size-2.5" /> Optimization Complete!
+                <div className="space-y-1.5 text-xs">
+                  <p className="font-bold text-slate-900 dark:text-white">API Engineering & Database</p>
+                  <p className="text-slate-600 dark:text-slate-300 text-[11px] leading-relaxed">
+                    Repository <code className="text-indigo-600 font-mono">JobMate/CoreService</code> with verified author commit history.
                   </p>
-                  <p className="mt-0.5 text-[8px] text-muted-foreground">
-                    ATS Score boosted to <span className="font-bold text-foreground">97%</span>. Tailored 4 key achievements.
-                  </p>
-                  <div className="mt-1.5 flex items-center justify-between rounded bg-background p-1.5 border border-border">
-                    <span className="text-[7.5px] font-semibold text-foreground truncate">📄 Resume_Stripe_PM.pdf</span>
-                    <span className="text-[7.5px] font-bold text-primary">Download</span>
+                  <div className="flex flex-wrap gap-1 pt-1">
+                    <span className="text-[10px] font-mono bg-white dark:bg-slate-900 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-800">TypeScript</span>
+                    <span className="text-[10px] font-mono bg-white dark:bg-slate-900 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-800">Supabase</span>
+                    <span className="text-[10px] font-mono bg-white dark:bg-slate-900 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-800">REST API</span>
                   </div>
                 </div>
               </div>
 
-              {/* Mini Input Box */}
-              <div className="flex items-center gap-1.5 rounded-md bg-section px-2 py-1 text-[8px] text-muted-foreground border border-border/60">
-                <span className="flex-1 truncate">Type a message or upload JD...</span>
-                <Send className="size-2.5 text-primary" />
+              {/* Node 3: Grounded Application Claim */}
+              <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">03. Grounded Application</span>
+                  <span className="font-mono text-[10px] text-emerald-600 bg-emerald-50 dark:bg-emerald-950/80 px-1.5 py-0.5 rounded">ATS 100%</span>
+                </div>
+                <div className="bg-white dark:bg-slate-900 p-2.5 rounded-lg border border-slate-200/60 dark:border-slate-800 space-y-1">
+                  <p className="text-xs font-semibold text-slate-900 dark:text-white">
+                    • Engineered high-throughput REST API handlers with Supabase PostgreSQL integration.
+                  </p>
+                  <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
+                    ✓ Proven by AST file range src/api/users.ts
+                  </p>
+                </div>
+                <p className="text-xs text-slate-500">Emitted directly to ATS-proof Overleaf pdflatex source.</p>
               </div>
             </div>
-          )}
+          </div>
         </div>
-      </div>
-    </article>
-  );
-}
+      </section>
 
-function AccessSection() {
-  return (
-    <section className="bg-background py-20 lg:py-24">
-      <div className="page-shell">
-        <SectionIntro title="Access JobMate Your Way">
-          Get started the way you prefer — use our web dashboard or simply chat with JobMate on Telegram.
-        </SectionIntro>
-        <div className="mt-12 grid gap-6 lg:grid-cols-2">
-          <AccessCard type="dashboard" />
-          <AccessCard type="telegram" />
+      {/* 2. THE PROBLEM SECTION: Traditional Resumes vs JobMate */}
+      <section className="py-20 bg-white dark:bg-slate-900 border-b border-slate-200/60 dark:border-slate-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center max-w-3xl mx-auto space-y-4 mb-14">
+            <h2 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+              Why Traditional Career & AI Tools Fail
+            </h2>
+            <p className="text-slate-600 dark:text-slate-300 text-base">
+              Most resume tools ask: <strong className="text-slate-900 dark:text-white">"What skills do you have?"</strong><br className="hidden sm:inline" />
+              JobMate asks: <strong className="text-indigo-600 dark:text-indigo-400">"What evidence proves you have them?"</strong>
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+            {/* Traditional Resume Approach */}
+            <div className="rounded-2xl border border-rose-200 dark:border-rose-950 bg-rose-50/20 dark:bg-rose-950/10 p-6 space-y-4">
+              <div className="flex items-center gap-2 text-rose-600 dark:text-rose-400 font-bold text-sm">
+                <ShieldAlert className="size-4" />
+                <span>Traditional Resumes & Generic AI</span>
+              </div>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Keyword Stuffing & Fabricated Claims</h3>
+              <ul className="space-y-3 text-xs text-slate-600 dark:text-slate-300 font-medium">
+                <li className="flex items-start gap-2">
+                  <span className="text-rose-500 font-bold">✕</span>
+                  <span><strong>Unsubstantiated Lists:</strong> Listing "React, Python, PostgreSQL" without verifiable proof.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-rose-500 font-bold">✕</span>
+                  <span><strong>Hallucinated Metrics:</strong> AI prompt wrappers inventing fake percentages and revenue impact.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-rose-500 font-bold">✕</span>
+                  <span><strong>ATS Table Parsing Failures:</strong> Multi-column graphics truncated by enterprise recruiters.</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* JobMate Evidence Approach */}
+            <div className="rounded-2xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50/20 dark:bg-emerald-950/10 p-6 space-y-4">
+              <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold text-sm">
+                <ShieldCheck className="size-4" />
+                <span>JobMate Evidence Intelligence</span>
+              </div>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Multi-Signal Code Proof & Attribution</h3>
+              <ul className="space-y-3 text-xs text-slate-600 dark:text-slate-300 font-medium">
+                <li className="flex items-start gap-2">
+                  <span className="text-emerald-500 font-bold">✓</span>
+                  <span><strong>Real AST Verification:</strong> Every skill maps to source files, exported functions, and schemas.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-emerald-500 font-bold">✓</span>
+                  <span><strong>Adversarial Claim Gate:</strong> Blocks unverified metrics and flags stale candidate records.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-emerald-500 font-bold">✓</span>
+                  <span><strong>Deterministic pdflatex Source:</strong> 100% ATS-compliant single-column LaTeX compilation.</span>
+                </li>
+              </ul>
+            </div>
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
+
+      {/* 3. 5-STEP WORKFLOW: How It Works */}
+      <section id="how-it-works" className="py-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center max-w-3xl mx-auto space-y-3 mb-16">
+          <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Engineering Workflow</span>
+          <h2 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+            How Evidence Intelligence Works
+          </h2>
+          <p className="text-slate-600 dark:text-slate-400 text-sm">
+            A deterministic pipeline turning your real engineering history into verifiable job applications.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          {[
+            {
+              step: "01",
+              title: "Connect",
+              desc: "Link GitHub repositories and career artifacts to snapshot your work.",
+              icon: FolderGit2,
+            },
+            {
+              step: "02",
+              title: "Understand",
+              desc: "Multi-language AST inspects syntax trees, routes, DB calls, and tests.",
+              icon: Code2,
+            },
+            {
+              step: "03",
+              title: "Match",
+              desc: "Target JDs are decomposed into atomic hard/soft skill requirement graphs.",
+              icon: Target,
+            },
+            {
+              step: "04",
+              title: "Verify",
+              desc: "Evidence classified as Supported, Partial, Conflicted, or Stale.",
+              icon: ShieldCheck,
+            },
+            {
+              step: "05",
+              title: "Build",
+              desc: "Identifies proof gaps and generates single-column LaTeX resumes.",
+              icon: FileCode,
+            },
+          ].map((item) => (
+            <div
+              key={item.step}
+              className="rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 p-5 shadow-xs space-y-3 hover:border-indigo-300 dark:hover:border-indigo-800 transition-colors"
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-mono font-bold text-xs text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/80 px-2 py-0.5 rounded-md">
+                  {item.step}
+                </span>
+                <item.icon className="size-4 text-slate-400" />
+              </div>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">{item.title}</h3>
+              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">{item.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* 4. SIGNATURE EVIDENCE GRAPH SECTION */}
+      <section id="evidence-graph" className="py-20 bg-slate-900 text-white border-y border-slate-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            <div className="space-y-6">
+              <span className="text-xs font-mono font-bold text-indigo-400 uppercase tracking-widest">Truth-Grounded Graph</span>
+              <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
+                Trace any accomplishment back to an exact AST node and commit.
+              </h2>
+              <p className="text-slate-400 text-sm sm:text-base leading-relaxed">
+                JobMate never simply generates claims out of thin air. When an application states you built a payment workflow or designed a vector search pipeline, it retains complete provenance:
+              </p>
+              <div className="space-y-3 font-mono text-xs text-slate-300 bg-slate-950/80 p-4 rounded-xl border border-slate-800">
+                <p className="text-indigo-400 font-bold">Candidate</p>
+                <p className="pl-3">└── Repository <span className="text-slate-500">(JobMate/CoreService)</span></p>
+                <p className="pl-6">└── File <span className="text-slate-500">(src/api/users.ts)</span></p>
+                <p className="pl-9">└── AST Symbol <span className="text-slate-500">(createUser: L14-L38)</span></p>
+                <p className="pl-12 text-emerald-400">└── Evidence Item (L4_SOURCE_CODE)</p>
+                <p className="pl-15 text-indigo-300">└── Grounded Job Requirement Match</p>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-800 bg-slate-950 p-6 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <span className="text-xs font-bold text-slate-300">Supported AST Parsers</span>
+                <span className="text-[11px] font-mono text-emerald-400">73/73 Tests Passing</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
+                {[
+                  { lang: "TypeScript / TSX", parser: "TS Compiler API", fact: "Classes, Hooks, Routes" },
+                  { lang: "JavaScript / JSX", parser: "V8 AST Engine", fact: "Express, Fastify API" },
+                  { lang: "Python", parser: "Tokenizer & AST", fact: "FastAPI, SQLAlchemy" },
+                  { lang: "Java", parser: "Spring AST Parser", fact: "REST Controllers, JPA" },
+                  { lang: "Go", parser: "Go Receiver Parser", fact: "Gin Routes, database/sql" },
+                  { lang: "Rust", parser: "Syntax Tree Parser", fact: "Actix, Axum, SQLx" },
+                ].map((item) => (
+                  <div key={item.lang} className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
+                    <p className="font-bold text-slate-200">{item.lang}</p>
+                    <p className="text-[10px] text-indigo-400 font-mono">{item.parser}</p>
+                    <p className="text-[10px] text-slate-500">{item.fact}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 5. PRODUCT CAPABILITIES SECTION */}
+      <section id="capabilities" className="py-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center max-w-3xl mx-auto space-y-3 mb-16">
+          <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Core Capabilities</span>
+          <h2 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+            Developer-First Career Intelligence
+          </h2>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 p-6 shadow-xs space-y-3">
+            <FolderGit2 className="size-6 text-indigo-600" />
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">Evidence Explorer</h3>
+            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+              Explore every independent signal mined from your work: dependency manifests, AST exported handlers, commit histories, and CI pipelines.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 p-6 shadow-xs space-y-3">
+            <Target className="size-6 text-indigo-600" />
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">Skill Gap vs Evidence Gap</h3>
+            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+              Know the difference between capabilities you lack versus skills you possess but haven't proven yet — with concrete artifact roadmaps to close gaps.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 p-6 shadow-xs space-y-3">
+            <FileCode className="size-6 text-indigo-600" />
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">Single-Column LaTeX Engine</h3>
+            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+              Compiles deterministic Overleaf pdflatex-compatible `.tex` source code adhering to strict single-column ATS typography and glyph standards.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* 6. CALL TO ACTION FOOTER BANNER */}
+      <section className="py-16 bg-slate-900 text-white border-t border-slate-800">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-6">
+          <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
+            Know what you can prove. Build what you can't.
+          </h2>
+          <p className="text-slate-400 text-sm max-w-xl mx-auto">
+            Connect your engineering profile to extract multi-signal evidence and generate ATS-grounded job applications today.
+          </p>
+          <div className="pt-2">
+            <Link
+              to={user ? "/dashboard" : "/login"}
+              className={cn(
+                buttonVariants({ variant: "primary" }),
+                "gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm px-8 py-3.5 rounded-xl shadow-lg shadow-indigo-600/30 transition-all hover:scale-105"
+              )}
+            >
+              <span>Analyze My Profile</span>
+              <ArrowRight className="size-4" />
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <JobMateLogo size="sm" />
+          <p className="text-xs text-slate-500">
+            Real Skills. Real Evidence. Real Opportunities. © {new Date().getFullYear()} JobMate AI.
+          </p>
+          <div className="flex items-center gap-4 text-xs font-medium text-slate-500">
+            <a href="https://github.com/SumitRaikwar18/JobMate" target="_blank" rel="noreferrer" className="hover:text-slate-900 dark:hover:text-white">
+              GitHub
+            </a>
+            <Link to="/templates" className="hover:text-slate-900 dark:hover:text-white">
+              Templates
+            </Link>
+          </div>
+        </div>
+      </footer>
+    </div>
   );
-}
-
-function Footer() {
-  return <footer className="border-t border-border bg-background py-8"><div className="page-shell flex flex-col items-center gap-6 text-center md:flex-row md:text-left"><Logo compact /><nav className="flex flex-wrap justify-center gap-x-7 gap-y-2 md:ml-auto">{navItems.map((item) => <Link key={item.label} to={item.to} {...(item.hash ? { hash: item.hash } : {})} className="text-xs text-muted-foreground hover:text-primary">{item.label}</Link>)}</nav><p className="text-xs text-muted-foreground md:ml-auto">© 2026 JobMate. All rights reserved.</p></div></footer>;
-}
-
-export function JobMateLanding() {
-  return <><Navbar /><main><Hero /><FeatureSection /><TemplatesSection /><AccessSection /></main><Footer /></>;
 }

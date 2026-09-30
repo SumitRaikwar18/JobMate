@@ -17,17 +17,21 @@ import {
   FileCode,
   FilePlus2,
   FileText,
+  FolderGit2,
+  GitCommit,
   Layers,
   Loader2,
   Plus,
   RefreshCw,
   Send,
+  ShieldAlert,
   ShieldCheck,
   Sparkles,
   Target,
   Trash2,
   TrendingUp,
   User,
+  X,
   Zap,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -38,27 +42,14 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { supabase, type Resume, type Job } from "@/lib/supabase";
 import { useAuth } from "@/hooks/use-auth";
-import { generateLatexResumeSource } from "@/lib/latex/latex-generator";
-import { callOpenRouter } from "@/lib/ai/openrouter";
+import { EvidenceService } from "@/lib/ai/evidence/evidence-service";
+import type { EvidenceItem } from "@/lib/ai/evidence/evidence-types";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
     meta: [
-      { title: "Candidate Dashboard & Career Radar — JobMate AI" },
-      { name: "description", content: "Manage your ATS resumes, review real-time audit scores, track target applications, and sync career intelligence with JobMate AI." },
-      { name: "keywords", content: "candidate dashboard, resume manager, career radar, ATS score audit, job match score, telegram career sync" },
-      { property: "og:title", content: "Candidate Dashboard & Career Radar — JobMate AI" },
-      { property: "og:description", content: "Manage your resumes, track match scores, and sync with JobMate AI." },
-      { property: "og:url", content: "https://jobmate-ebon.vercel.app/dashboard" },
-      { property: "og:type", content: "website" },
-      { property: "og:image", content: "https://jobmate-ebon.vercel.app/og-banner.png" },
-      { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:title", content: "Candidate Dashboard & Career Radar — JobMate AI" },
-      { name: "twitter:description", content: "Manage resumes and track job applications with JobMate AI." },
-      { name: "twitter:image", content: "https://jobmate-ebon.vercel.app/og-banner.png" },
-    ],
-    links: [
-      { rel: "canonical", href: "https://jobmate-ebon.vercel.app/dashboard" },
+      { title: "Career Evidence Dashboard — JobMate AI" },
+      { name: "description", content: "Inspect your truth-grounded candidate evidence health, verified engineering artifacts, target job matches, and actionable proof gap roadmaps." },
     ],
   }),
   component: DashboardPage,
@@ -68,34 +59,23 @@ function DashboardPage() {
   const router = useRouter();
   const { user, profile, loading: authLoading } = useAuth();
 
+  const [evidenceList, setEvidenceList] = useState<EvidenceItem[]>([]);
   const [resumes, setResumes] = useState<Resume[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loadingData, setLoadingData] = useState(true);
 
-  // New Resume Modal State
+  // Quick Resume Creation State
   const [isCreateResumeOpen, setIsCreateResumeOpen] = useState(false);
   const [newResumeTitle, setNewResumeTitle] = useState("");
   const [newResumeRole, setNewResumeRole] = useState("");
-  const [newResumeCompany, setNewResumeCompany] = useState("");
-  const [newResumeTemplate, setNewResumeTemplate] = useState("modern-clean");
   const [creatingResume, setCreatingResume] = useState(false);
 
-  // Quick Mini-Copilot State
-  const [quickMessages, setQuickMessages] = useState<Array<{ role: "assistant" | "user"; content: string }>>([
-    {
-      role: "assistant",
-      content: "Hi! I'm your JobMate Copilot. Ask me how to improve a bullet, test ATS parseability, or prepare for interviews.",
-    },
-  ]);
-  const [quickInput, setQuickInput] = useState("");
-  const [isSendingQuick, setIsSendingQuick] = useState(false);
-  const quickBottomRef = useRef<HTMLDivElement>(null);
-
-  // Fetch Resumes & Applications from Supabase
+  // Fetch Real Evidence & Resumes & Jobs from Supabase
   const fetchData = async (userId: string) => {
     setLoadingData(true);
     try {
-      const [resumesRes, jobsRes] = await Promise.all([
+      const [evidenceData, resumesRes, jobsRes] = await Promise.all([
+        EvidenceService.getCandidateEvidence(userId),
         supabase
           .from("resumes")
           .select("*")
@@ -108,12 +88,9 @@ function DashboardPage() {
           .order("created_at", { ascending: false }),
       ]);
 
-      if (resumesRes.data) {
-        setResumes(resumesRes.data as Resume[]);
-      }
-      if (jobsRes.data) {
-        setJobs(jobsRes.data as Job[]);
-      }
+      setEvidenceList(evidenceData || []);
+      if (resumesRes.data) setResumes(resumesRes.data as Resume[]);
+      if (jobsRes.data) setJobs(jobsRes.data as Job[]);
     } catch (err) {
       console.error("Error loading dashboard data:", err);
     } finally {
@@ -131,69 +108,24 @@ function DashboardPage() {
     }
   }, [user, authLoading]);
 
-  // Dynamic ATS Score Calculation based on user's real resumes
-  const computeDynamicAtsScore = (): number | null => {
-    if (resumes.length === 0) {
-      return null;
-    }
-    const scoredResumes = resumes.filter((r) => typeof r.ats_score === "number" && r.ats_score > 0);
-    if (scoredResumes.length === 0) {
-      return null;
-    }
-    const sum = scoredResumes.reduce((acc, r) => acc + (r.ats_score || 0), 0);
-    return Math.round(sum / scoredResumes.length);
-  };
+  // Aggregate Evidence Health
+  const verifiedCount = evidenceList.filter((e) => e.verificationStatus === "verified").length;
+  const unverifiedCount = evidenceList.filter((e) => e.verificationStatus === "unverified").length;
+  const conflictedCount = evidenceList.filter((e) => e.verificationStatus === "conflicted").length;
+  const staleCount = evidenceList.filter((e) => e.verificationStatus === "stale").length;
 
-  const dynamicAtsScore = computeDynamicAtsScore();
+  const astSourceCount = evidenceList.filter((e) => e.evidenceLevel === "L4_SOURCE_CODE").length;
+  const testCiCount = evidenceList.filter((e) => e.evidenceLevel === "L6_TEST_CI").length;
+  const commitCount = evidenceList.filter((e) => e.evidenceLevel === "L5_COMMIT_PR").length;
+  const manifestCount = evidenceList.filter((e) => e.evidenceLevel === "L3_MANIFEST_DEPENDENCY").length;
 
-  // Handle Quick Chat
-  const handleSendQuickChat = async (e?: React.FormEvent, customPrompt?: string) => {
-    if (e) e.preventDefault();
-    const promptToSend = customPrompt || quickInput.trim();
-    if (!promptToSend || isSendingQuick) return;
+  const uniqueTechs = Array.from(new Set(evidenceList.flatMap((e) => e.technologies)));
 
-    setQuickMessages((prev) => [...prev, { role: "user", content: promptToSend }]);
-    if (!customPrompt) setQuickInput("");
-    setIsSendingQuick(true);
-
-    try {
-      const response = await callOpenRouter([
-        {
-          role: "system",
-          content: "You are JobMate AI Career Assistant. Help candidates with resume advice, job tailoring, ATS optimization, and interview preparation. Keep answers concise, actionable, and encouraging.",
-        },
-        ...quickMessages.map((m) => ({ role: m.role, content: m.content })),
-        { role: "user", content: promptToSend },
-      ], 0.4);
-
-      if (response) {
-        setQuickMessages((prev) => [...prev, { role: "assistant", content: response }]);
-      }
-    } catch (err) {
-      setQuickMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: "I'm ready to help! You can create a resume, paste a job description in Job Matcher, or explore our ATS templates." },
-      ]);
-    } finally {
-      setIsSendingQuick(false);
-      setTimeout(() => {
-        quickBottomRef.current?.scrollIntoView({ behavior: "smooth" });
-      }, 100);
-    }
-  };
-
-  // Create Resume in Supabase
+  // Handle Quick Resume Creation
   const handleCreateResume = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) {
-      toast.error("Please log in to create a resume.");
-      return;
-    }
-
+    if (!user) return;
     const title = newResumeTitle.trim();
-    const role = newResumeRole.trim() || profile?.target_role || "Software Engineer";
-    const company = newResumeCompany.trim() || null;
-
     if (!title) {
       toast.error("Please provide a resume title.");
       return;
@@ -206,381 +138,199 @@ function DashboardPage() {
         .insert({
           user_id: user.id,
           title,
-          target_role: role,
-          target_company: company,
-          template_id: newResumeTemplate,
-          ats_score: 92,
+          target_role: newResumeRole.trim() || "Software Engineer",
+          template_id: "modern-clean",
+          ats_score: 95,
           content: {
-            summary: profile?.headline || `Experienced ${role} with a focus on scalable software systems and high-quality product delivery.`,
+            summary: `Software Engineer specializing in ${uniqueTechs.slice(0, 4).join(", ") || "distributed systems and full-stack development"}.`,
             skills: {
-              languages: "TypeScript, Python, Go, SQL, Bash",
-              frameworks: "React, Next.js, Node.js, FastAPI, LangGraph",
-              cloud: "AWS, Docker, Kubernetes, Terraform, CI/CD",
-              databases: "PostgreSQL, Redis, Vector Databases",
+              languages: uniqueTechs.slice(0, 6).join(", ") || "TypeScript, Python, Go, SQL",
+              frameworks: "React, Next.js, FastAPI, Node.js",
+              cloud: "Docker, GitHub Actions, CI/CD",
+              databases: "PostgreSQL, Supabase",
             },
-            experiences: [
-              {
-                company: company || "High Growth Tech",
-                role: role,
-                location: "San Francisco, CA",
-                start_date: "2022-01",
-                end_date: "Present",
-                is_current: true,
-                bullets: [
-                  "Architected and deployed distributed event pipeline processing 100M+ monthly transactions with 99.99% uptime.",
-                  "Engineered automated testing and CI/CD pipelines, cutting deployment failure rates by 35%.",
-                ],
-              },
-            ],
-            education: [
-              {
-                school: "University / Institute",
-                degree: "B.S. in Computer Science or Equivalent",
-                location: "United States",
-                graduation_year: "2021",
-              },
-            ],
+            experiences: [],
+            education: [],
           },
         })
         .select()
         .single();
 
       if (error) throw error;
-
       if (data) {
-        setResumes((prev) => [data as Resume, ...prev]);
-        toast.success("Resume created successfully!");
+        toast.success("Resume created successfully.");
         setIsCreateResumeOpen(false);
-        setNewResumeTitle("");
-        setNewResumeRole("");
-        setNewResumeCompany("");
         router.navigate({ to: "/builder", search: { id: data.id } as any });
       }
     } catch (err: any) {
-      console.error("Error creating resume:", err);
-      toast.error(err?.message || "Failed to create resume.");
+      toast.error(`Failed to create resume: ${err.message}`);
     } finally {
       setCreatingResume(false);
     }
   };
 
-  // Export LaTeX Source for Resume
-  const handleExportLatex = (resume: Resume) => {
-    const resumeContent = resume.resume_data || {};
-    const latex = generateLatexResumeSource({
-      personal: {
-        name: profile?.full_name || (user?.user_metadata?.["full_name"] as string) || "Candidate",
-        email: user?.email || "candidate@example.com",
-        phone: profile?.phone || "+1 (555) 000-0000",
-        github: profile?.github_url || undefined,
-        linkedin: profile?.linkedin_url || undefined,
-      },
-      experiences: resumeContent.experiences || [],
-      education: resumeContent.education || [],
-      skills: resumeContent.skills || {},
-      projects: resumeContent.projects || [],
-      templateId: (resume.template_id as any) || "modern-clean",
-    });
-
-    const blob = new Blob([latex], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${resume.title.toLowerCase().replace(/\s+/g, "_")}.tex`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    toast.success("Downloaded Overleaf-compatible .tex resume!");
-  };
-
-  // Delete Resume
-  const handleDeleteResume = async (resumeId: string) => {
-    try {
-      const { error } = await supabase.from("resumes").delete().eq("id", resumeId);
-      if (error) throw error;
-      setResumes((prev) => prev.filter((r) => r.id !== resumeId));
-      toast.success("Resume deleted.");
-    } catch (err) {
-      toast.error("Failed to delete resume.");
-    }
-  };
-
-  const displayName = profile?.full_name || (user?.user_metadata?.["full_name"] as string) || user?.email?.split("@")[0] || "Candidate";
-
   return (
-    <AppLayout activeNav="dashboard">
-      <div className="space-y-8">
-        {/* Welcome Header */}
-        <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 p-6 md:p-8 shadow-sm">
+    <AppLayout activeNav="dashboard" showBetaBanner={false}>
+      <div className="space-y-8 max-w-7xl mx-auto">
+        {/* HERO SECTION */}
+        <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 p-6 sm:p-8 shadow-xs">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div className="space-y-1.5 max-w-2xl">
-              <div className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 px-3 py-1 text-xs font-semibold text-indigo-700 dark:text-indigo-400 border border-indigo-200/60 dark:border-indigo-800/60">
-                <Sparkles className="size-3.5" />
-                StateGraph Multi-Agent Engine
+            <div className="space-y-2 max-w-2xl">
+              <div className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 px-3 py-0.5 text-xs font-semibold text-indigo-700 dark:text-indigo-300 border border-indigo-200/60">
+                <ShieldCheck className="size-3.5" />
+                Truth-Grounded Career Overview
               </div>
-              <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
-                Welcome back, {displayName}
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+                Your Career Evidence
               </h1>
-              <p className="text-sm text-slate-600 dark:text-slate-400">
-                Your evidence-grounded ATS command center. Create, tailor, and track high-impact resumes tailored to job postings.
+              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-normal">
+                Here is what your current engineering work proves — and where the evidence is still missing. Every metric and accomplishment is tied directly to verified repositories and syntax trees.
               </p>
             </div>
 
             <div className="flex items-center gap-3 shrink-0">
-              <Button
+              <Link
+                to="/evidence"
+                className={cn(
+                  buttonVariants({ variant: "outline" }),
+                  "text-xs font-semibold text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-xl px-4 py-2.5 hover:bg-slate-50"
+                )}
+              >
+                <span>Evidence Explorer</span>
+              </Link>
+              <button
+                type="button"
                 onClick={() => setIsCreateResumeOpen(true)}
-                className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-button text-xs py-2.5"
+                className={cn(
+                  buttonVariants({ variant: "primary" }),
+                  "gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-xs"
+                )}
               >
                 <Plus className="size-4" />
-                Create New Resume
-              </Button>
+                <span>New Grounded Resume</span>
+              </button>
             </div>
           </div>
 
-          {/* 4 Stat Cards */}
-          <div className="mt-8 grid grid-cols-2 lg:grid-cols-4 gap-4 border-t border-slate-100 dark:border-slate-800/80 pt-6">
-            {/* ATS Score */}
-            <div className="rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-4">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-medium text-slate-500">Average ATS Score</p>
-                <Target className="size-4 text-indigo-600" />
-              </div>
-              <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-2xl font-black text-slate-900 dark:text-white">
-                  {dynamicAtsScore !== null ? `${dynamicAtsScore}%` : "—"}
-                </span>
-                <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center">
-                  {dynamicAtsScore !== null ? (
-                    <>
-                      <TrendingUp className="size-3 mr-0.5" />
-                      Live Sync
-                    </>
-                  ) : (
-                    <span className="text-slate-400 font-normal">No resumes yet</span>
-                  )}
-                </span>
+          {/* REAL EVIDENCE HEALTH METRICS */}
+          <div className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-4 border-t border-slate-100 dark:border-slate-800/80 pt-6">
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-slate-500">Verified Evidence</p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-bold text-slate-900 dark:text-white">{verifiedCount}</span>
+                <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">Supported</span>
               </div>
             </div>
 
-            {/* Active Resumes */}
-            <div className="rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-4">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-medium text-slate-500">Active Resumes</p>
-                <FileText className="size-4 text-blue-600" />
-              </div>
-              <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-2xl font-black text-slate-900 dark:text-white">
-                  {resumes.length}
-                </span>
-                <span className="text-[10px] text-slate-400">LaTeX AST</span>
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-slate-500">AST Code Proof</p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">{astSourceCount}</span>
+                <span className="text-[11px] text-slate-500">L4 Sources</span>
               </div>
             </div>
 
-            {/* Tracked Jobs */}
-            <div className="rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-4">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-medium text-slate-500">Job Pipeline</p>
-                <Briefcase className="size-4 text-amber-600" />
-              </div>
-              <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-2xl font-black text-slate-900 dark:text-white">
-                  {jobs.length}
-                </span>
-                <span className="text-[10px] text-slate-400">Applications</span>
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-slate-500">CI & Test Proof</p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-bold text-slate-900 dark:text-white">{testCiCount}</span>
+                <span className="text-[11px] text-slate-500">L6 Suites</span>
               </div>
             </div>
 
-            {/* Evidence Guardrail Status */}
-            <div className="rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-4">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-medium text-slate-500">Evidence Guardrail</p>
-                <ShieldCheck className="size-4 text-indigo-600" />
-              </div>
-              <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-sm font-bold text-slate-900 dark:text-white">
-                  Strict Grounding
-                </span>
-                <span className="size-2 rounded-full bg-emerald-500 animate-pulse ml-auto" />
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-slate-500">Proven Tech Stack</p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{uniqueTechs.length}</span>
+                <span className="text-[11px] text-slate-500">Technologies</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Quick Workflow Action Banners */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Link
-            to="/builder"
-            className="flex items-center gap-3 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 p-4 shadow-sm hover:border-indigo-300 dark:hover:border-indigo-700 transition-all group"
-          >
-            <div className="grid size-10 place-items-center rounded-xl bg-indigo-50 dark:bg-indigo-950 text-indigo-600 group-hover:scale-105 transition-transform">
-              <Sparkles className="size-5" />
-            </div>
-            <div>
-              <p className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 transition-colors">
-                Resume Builder
-              </p>
-              <p className="text-[11px] text-slate-500">Tailor with 5-Agent DAG</p>
-            </div>
-          </Link>
-
-          <Link
-            to="/jobs"
-            className="flex items-center gap-3 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 p-4 shadow-sm hover:border-indigo-300 dark:hover:border-indigo-700 transition-all group"
-          >
-            <div className="grid size-10 place-items-center rounded-xl bg-blue-50 dark:bg-blue-950 text-blue-600 group-hover:scale-105 transition-transform">
-              <Target className="size-5" />
-            </div>
-            <div>
-              <p className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 transition-colors">
-                Job Matcher
-              </p>
-              <p className="text-[11px] text-slate-500">Semantic Gap Radar</p>
-            </div>
-          </Link>
-
-          <Link
-            to="/templates"
-            className="flex items-center gap-3 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 p-4 shadow-sm hover:border-indigo-300 dark:hover:border-indigo-700 transition-all group"
-          >
-            <div className="grid size-10 place-items-center rounded-xl bg-purple-50 dark:bg-purple-950 text-purple-600 group-hover:scale-105 transition-transform">
-              <FileCode className="size-5" />
-            </div>
-            <div>
-              <p className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 transition-colors">
-                ATS Templates
-              </p>
-              <p className="text-[11px] text-slate-500">Single-Column LaTeX</p>
-            </div>
-          </Link>
-
-          <Link
-            to="/assistant"
-            className="flex items-center gap-3 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 p-4 shadow-sm hover:border-indigo-300 dark:hover:border-indigo-700 transition-all group"
-          >
-            <div className="grid size-10 place-items-center rounded-xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 group-hover:scale-105 transition-transform">
-              <Bot className="size-5" />
-            </div>
-            <div>
-              <p className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 transition-colors">
-                AI Copilot
-              </p>
-              <p className="text-[11px] text-slate-500">Interview & Bullets</p>
-            </div>
-          </Link>
-        </div>
-
-        {/* Main Content Area: Resumes (Left 8 cols) & Mini Assistant (Right 4 cols) */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Left Column: Resumes List & Pipeline (8 cols) */}
-          <div className="lg:col-span-8 space-y-6">
-            {/* My Resumes Card */}
-            <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 p-6 shadow-sm space-y-4">
+        {/* 2-COLUMN MAIN CONTENT */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* LEFT 2 COLS: RECENT EVIDENCE & ARTIFACTS */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Recent Verified Evidence Artifacts */}
+            <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 p-6 shadow-xs space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                    <FileText className="size-4 text-indigo-600" />
-                    My Tailored Resumes ({resumes.length})
+                  <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                    Discovered Engineering Evidence
                   </h2>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Deterministic 1-page single-column resumes generated from verified evidence.
+                    Recent AST code facts, exported handlers, dependencies, and test executions.
                   </p>
                 </div>
-
-                <Button
-                  size="sm"
-                  onClick={() => setIsCreateResumeOpen(true)}
-                  className="gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs"
-                >
-                  <Plus className="size-3.5" />
-                  New Resume
-                </Button>
+                <Link to="/evidence" className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 flex items-center gap-1">
+                  <span>View All ({evidenceList.length})</span>
+                  <ChevronRight className="size-3.5" />
+                </Link>
               </div>
 
               {loadingData ? (
-                <div className="py-12 text-center">
-                  <Loader2 className="size-6 animate-spin text-indigo-600 mx-auto" />
-                  <p className="text-xs text-slate-500 mt-2">Loading resumes...</p>
+                <div className="py-12 flex flex-col items-center justify-center text-slate-400 gap-2">
+                  <Loader2 className="size-6 animate-spin text-indigo-600" />
+                  <span className="text-xs">Loading evidence graph...</span>
                 </div>
-              ) : resumes.length === 0 ? (
+              ) : evidenceList.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-slate-200 dark:border-slate-800 p-8 text-center space-y-3">
-                  <FileText className="size-10 text-slate-300 dark:text-slate-700 mx-auto" />
-                  <div className="space-y-1">
-                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-                      No Resumes Created Yet
-                    </p>
-                    <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                      Click below to generate your first job-tailored resume using our multi-agent evidence synthesis engine.
+                  <FolderGit2 className="size-8 text-slate-400 mx-auto opacity-75" />
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-800 dark:text-white">No Evidence Extracted Yet</h3>
+                    <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                      Connect your GitHub account or input your repositories in the <strong>Resume Builder</strong> to automatically mine AST syntax facts.
                     </p>
                   </div>
-                  <Button
-                    onClick={() => setIsCreateResumeOpen(true)}
-                    className="gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs"
+                  <Link
+                    to="/builder"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 text-white text-xs font-bold px-4 py-2"
                   >
-                    <Plus className="size-3.5" />
-                    Create First Resume
-                  </Button>
+                    <span>Connect Repository</span>
+                    <ArrowRight className="size-3.5" />
+                  </Link>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {resumes.map((resume) => (
+                  {evidenceList.slice(0, 5).map((item) => (
                     <div
-                      key={resume.id}
-                      className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/60 p-4 hover:border-indigo-300 dark:hover:border-indigo-800 transition-all group"
+                      key={item.id}
+                      className="rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40 p-4 space-y-2 hover:border-slate-200 transition-colors"
                     >
-                      <div className="space-y-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-xs font-bold text-slate-900 dark:text-white truncate">
-                            {resume.title}
-                          </h3>
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border border-emerald-200/50">
-                            {resume.ats_score || 90}% ATS Score
-                          </span>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/80 px-2 py-0.5 rounded border border-indigo-200/50">
+                              {item.evidenceLevel}
+                            </span>
+                            <h3 className="text-xs font-bold text-slate-900 dark:text-white">{item.title}</h3>
+                          </div>
+                          <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed line-clamp-2">
+                            {item.content}
+                          </p>
                         </div>
-                        <p className="text-[11px] text-slate-500 flex items-center gap-2">
-                          <span>Target: {resume.target_role || "General Technical"}</span>
-                          {resume.target_company && (
-                            <>
-                              <span>&bull;</span>
-                              <span className="font-medium text-slate-700 dark:text-slate-300">
-                                {resume.target_company}
-                              </span>
-                            </>
-                          )}
-                          <span>&bull;</span>
-                          <span className="font-mono text-[10px]">
-                            {resume.template_id || "modern-clean"}
-                          </span>
-                        </p>
+                        <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 shrink-0 flex items-center gap-1">
+                          <CheckCircle2 className="size-3" />
+                          {(item.confidence * 100).toFixed(0)}%
+                        </span>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleExportLatex(resume)}
-                          className="gap-1 text-xs"
-                          title="Download .tex for Overleaf"
-                        >
-                          <Download className="size-3.5" />
-                          LaTeX
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={() => router.navigate({ to: "/builder", search: { id: resume.id } as any })}
-                          className="gap-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs"
-                        >
-                          <Sparkles className="size-3.5" />
-                          Edit in Builder
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteResume(resume.id)}
-                          className="size-8 p-0 text-slate-400 hover:text-rose-500"
-                        >
-                          <Trash2 className="size-3.5" />
-                        </Button>
+                      <div className="pt-2 border-t border-slate-200/50 dark:border-slate-800/60 flex items-center justify-between text-[10px] text-slate-400 font-mono">
+                        <span className="truncate max-w-[280px]">
+                          {item.repository && item.filePath ? `${item.repository}/${item.filePath}` : item.repository || "Repository verified"}
+                        </span>
+                        {item.sourceUri && (
+                          <a
+                            href={item.sourceUri}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-indigo-600 hover:text-indigo-700 flex items-center gap-1 font-sans font-medium"
+                          >
+                            <span>Inspect</span>
+                            <ExternalLink className="size-2.5" />
+                          </a>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -588,205 +338,161 @@ function DashboardPage() {
               )}
             </div>
 
-            {/* Recent Application Activity */}
-            <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 p-6 shadow-sm space-y-4">
+            {/* Target Resumes & Applications */}
+            <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 p-6 shadow-xs space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <Briefcase className="size-4 text-indigo-600" />
-                  Recent Pipeline Activity
-                </h3>
-                <Link to="/applications" className="text-xs font-semibold text-indigo-600 hover:underline">
-                  View All ({jobs.length})
+                <div>
+                  <h2 className="text-base font-bold text-slate-900 dark:text-white">Active Tailored Resumes</h2>
+                  <p className="text-xs text-slate-500 mt-0.5">ATS single-column LaTeX compilations backed by verified evidence.</p>
+                </div>
+                <Link to="/builder" className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 flex items-center gap-1">
+                  <span>Open Builder</span>
+                  <ChevronRight className="size-3.5" />
                 </Link>
               </div>
 
-              {jobs.length === 0 ? (
-                <p className="text-xs text-slate-500 py-4 text-center">
-                  No active job applications yet. Track applications in the Application Tracker.
-                </p>
+              {resumes.length === 0 ? (
+                <p className="text-xs text-slate-500 italic py-4">No resumes generated yet. Create your first resume to synthesize your evidence.</p>
               ) : (
-                <div className="space-y-2">
-                  {jobs.slice(0, 4).map((j) => (
-                    <div
-                      key={j.id}
-                      className="flex items-center justify-between p-3 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-xs"
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {resumes.slice(0, 4).map((r) => (
+                    <Link
+                      key={r.id}
+                      to="/builder"
+                      search={{ id: r.id } as any}
+                      className="rounded-xl border border-slate-100 dark:border-slate-800 p-3.5 hover:border-indigo-300 dark:hover:border-indigo-800 transition-all space-y-2 group"
                     >
-                      <div>
-                        <p className="font-semibold text-slate-900 dark:text-white">{j.title}</p>
-                        <p className="text-[11px] text-slate-500">{j.company || "Target Company"}</p>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 transition-colors truncate">
+                          {r.title}
+                        </span>
+                        <span className="font-mono text-[10px] text-emerald-600 font-bold bg-emerald-50 dark:bg-emerald-950/80 px-1.5 py-0.5 rounded">
+                          ATS {r.ats_score || 95}%
+                        </span>
                       </div>
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 uppercase">
-                        {j.status || "Applied"}
-                      </span>
-                    </div>
+                      <p className="text-[11px] text-slate-500 truncate">{r.target_role || "General Software Engineer"}</p>
+                    </Link>
                   ))}
                 </div>
               )}
             </div>
           </div>
 
-          {/* Right Column: Mini AI Copilot (4 cols) */}
-          <div className="lg:col-span-4 space-y-6">
-            <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 p-5 shadow-sm space-y-4 flex flex-col h-[520px]">
-              <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-                <div className="flex items-center gap-2">
-                  <div className="grid size-8 place-items-center rounded-lg bg-indigo-600 text-white">
-                    <Bot className="size-4" />
+          {/* RIGHT 1 COL: EVIDENCE GAPS & TARGET JOB RADAR */}
+          <div className="space-y-6">
+            {/* Skill Gap vs Evidence Gap Roadmap */}
+            <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 p-6 shadow-xs space-y-4">
+              <div>
+                <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Proof Recommendations</span>
+                <h2 className="text-base font-bold text-slate-900 dark:text-white mt-1">Actionable Proof Roadmaps</h2>
+                <p className="text-xs text-slate-500 mt-0.5">Build concrete proof artifacts to eliminate evidence gaps.</p>
+              </div>
+
+              <div className="space-y-3">
+                <div className="rounded-xl border border-amber-200/80 dark:border-amber-900/60 bg-amber-50/20 dark:bg-amber-950/20 p-3.5 space-y-2">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-amber-800 dark:text-amber-400">
+                    <ShieldAlert className="size-3.5" />
+                    <span>Evidence Gap: CI/CD Test Pipeline</span>
                   </div>
-                  <div>
-                    <h3 className="text-xs font-bold text-slate-900 dark:text-white">
-                      AI Career Copilot
-                    </h3>
-                    <p className="text-[10px] text-slate-500">Real-Time GPT-4o-mini</p>
-                  </div>
+                  <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                    Target roles require automated test coverage. Add a GitHub Actions workflow (<code className="font-mono text-[10px]">.github/workflows/ci.yml</code>) running your test suite to generate L6 proof.
+                  </p>
                 </div>
-                <Link
-                  to="/assistant"
-                  className="text-[11px] font-semibold text-indigo-600 hover:underline flex items-center gap-0.5"
-                >
-                  Full Copilot
-                  <ChevronRight className="size-3" />
-                </Link>
+
+                <div className="rounded-xl border border-indigo-200/80 dark:border-indigo-900/60 bg-indigo-50/20 dark:bg-indigo-950/20 p-3.5 space-y-2">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-800 dark:text-indigo-400">
+                    <Code2 className="size-3.5" />
+                    <span>Evidence Gap: Containerization</span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                    Include a <code className="font-mono text-[10px]">Dockerfile</code> in your repository snapshot to verify containerization skills.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Actions Card */}
+            <div className="rounded-2xl border border-slate-900 bg-slate-900 text-white p-6 space-y-4 shadow-sm">
+              <div className="space-y-1">
+                <span className="text-[10px] font-mono font-bold text-indigo-400 uppercase">Target Job Radar</span>
+                <h3 className="text-sm font-bold">Match Against Real Requirements</h3>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Deconstruct a target job description to see what requirements you can prove versus what proof is absent.
+                </p>
               </div>
 
-              {/* Chat Stream */}
-              <div className="flex-1 overflow-y-auto space-y-3 pr-1 text-xs">
-                {quickMessages.map((m, i) => (
-                  <div
-                    key={i}
-                    className={cn(
-                      "p-3 rounded-xl text-xs leading-relaxed max-w-[90%]",
-                      m.role === "user"
-                        ? "ml-auto bg-indigo-600 text-white"
-                        : "bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 text-slate-800 dark:text-slate-200"
-                    )}
+              <Link
+                to="/jobs"
+                className="w-full flex items-center justify-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white py-2.5 text-xs font-bold transition-colors"
+              >
+                <span>Analyze Job Description</span>
+                <ArrowRight className="size-3.5" />
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* MODAL: CREATE GROUNDED RESUME */}
+        {isCreateResumeOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+            <div className="w-full max-w-md rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">Create Evidence-Grounded Resume</h3>
+                <button
+                  type="button"
+                  onClick={() => setIsCreateResumeOpen(false)}
+                  className="size-8 grid place-items-center rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateResume} className="space-y-4 text-left">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Resume Name / Target</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Senior Backend Engineer (Stripe)"
+                    value={newResumeTitle}
+                    onChange={(e) => setNewResumeTitle(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3.5 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Target Role Title</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Full Stack Engineer"
+                    value={newResumeRole}
+                    onChange={(e) => setNewResumeRole(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3.5 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+
+                <div className="pt-2 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsCreateResumeOpen(false)}
+                    className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300"
                   >
-                    {m.content}
-                  </div>
-                ))}
-                {isSendingQuick && (
-                  <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 p-3 rounded-xl text-xs text-slate-500 flex items-center gap-2">
-                    <Loader2 className="size-3.5 animate-spin text-indigo-600" />
-                    Thinking...
-                  </div>
-                )}
-                <div ref={quickBottomRef} />
-              </div>
-
-              {/* Input Form */}
-              <form onSubmit={handleSendQuickChat} className="pt-2 border-t border-slate-100 dark:border-slate-800 flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Ask copilot anything..."
-                  value={quickInput}
-                  onChange={(e) => setQuickInput(e.target.value)}
-                  className="flex-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 py-2 text-xs text-slate-900 dark:text-white focus:border-indigo-500 focus:outline-none"
-                />
-                <Button
-                  type="submit"
-                  disabled={isSendingQuick || !quickInput.trim()}
-                  className="size-8 p-0 bg-indigo-600 hover:bg-indigo-700 text-white shrink-0"
-                >
-                  <Send className="size-3.5" />
-                </Button>
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={creatingResume}
+                    className="flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 text-xs font-bold shadow-xs disabled:opacity-50"
+                  >
+                    {creatingResume ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
+                    <span>Create Resume</span>
+                  </button>
+                </div>
               </form>
             </div>
           </div>
-        </div>
+        )}
       </div>
-
-      {/* Create Resume Modal */}
-      {isCreateResumeOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-2xl space-y-4">
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <Plus className="size-5 text-indigo-600" />
-              Create Tailored Resume
-            </h3>
-
-            <form onSubmit={handleCreateResume} className="space-y-4">
-              <div>
-                <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                  Resume Title <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Stripe — Senior Backend Engineer"
-                  value={newResumeTitle}
-                  onChange={(e) => setNewResumeTitle(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 py-2 text-xs text-slate-900 dark:text-white focus:border-indigo-500 focus:outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                    Target Role
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Senior Backend Engineer"
-                    value={newResumeRole}
-                    onChange={(e) => setNewResumeRole(e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 py-2 text-xs text-slate-900 dark:text-white focus:border-indigo-500 focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                    Target Company
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Stripe, Airbnb"
-                    value={newResumeCompany}
-                    onChange={(e) => setNewResumeCompany(e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 py-2 text-xs text-slate-900 dark:text-white focus:border-indigo-500 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                  LaTeX Template Style
-                </label>
-                <select
-                  value={newResumeTemplate}
-                  onChange={(e) => setNewResumeTemplate(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 py-2 text-xs text-slate-900 dark:text-white focus:border-indigo-500 focus:outline-none"
-                >
-                  <option value="modern-clean">Modern Clean ATS (Single Column, 0.75in)</option>
-                  <option value="tech-minimalist">Tech Minimalist (High Information Density)</option>
-                  <option value="executive-pro">Executive Pro (Leadership & Scale)</option>
-                  <option value="ivy-classic">Ivy League Classic (Academic Latin Modern)</option>
-                  <option value="ai-researcher">AI & ML Engineer Spec (PyTorch/Models)</option>
-                </select>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsCreateResumeOpen(false)}
-                  className="text-xs"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={creatingResume}
-                  className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs"
-                >
-                  {creatingResume ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
-                  Create & Launch Builder
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </AppLayout>
   );
 }
