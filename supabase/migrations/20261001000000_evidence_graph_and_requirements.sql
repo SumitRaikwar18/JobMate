@@ -25,12 +25,15 @@ CREATE INDEX IF NOT EXISTS idx_evidence_snapshots_hash ON evidence_snapshots(con
 -- 3. Core Evidence Items Table (With pgvector embeddings & L0-L7 evidence hierarchy)
 CREATE TABLE IF NOT EXISTS candidate_evidence (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  candidate_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  source_type TEXT NOT NULL, -- 'github', 'resume', 'experience', 'project', 'education', 'external'
-  evidence_level TEXT NOT NULL, -- 'L0_USER_ASSERTION', 'L1_RESUME_CLAIM', 'L2_README_CLAIM', 'L3_MANIFEST_DEPENDENCY', 'L4_SOURCE_CODE', 'L5_COMMIT_PR', 'L6_TEST_CI', 'L7_EXTERNAL'
-  verification_status TEXT NOT NULL DEFAULT 'unverified', -- 'unverified', 'partially_verified', 'verified', 'conflicted', 'stale', 'rejected'
-  title TEXT NOT NULL,
-  content TEXT NOT NULL,
+  candidate_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  source_type TEXT NOT NULL DEFAULT 'manual',
+  evidence_level TEXT NOT NULL DEFAULT 'L4_SOURCE_CODE',
+  verification_status TEXT NOT NULL DEFAULT 'unverified',
+  title TEXT NOT NULL DEFAULT 'Evidence',
+  content TEXT NOT NULL DEFAULT '',
+  source_id TEXT,
+  source_url TEXT,
   source_uri TEXT,
   repository TEXT,
   file_path TEXT,
@@ -42,6 +45,7 @@ CREATE TABLE IF NOT EXISTS candidate_evidence (
   concepts TEXT[] DEFAULT '{}',
   metrics JSONB DEFAULT '[]'::jsonb,
   confidence DOUBLE PRECISION NOT NULL DEFAULT 0.5,
+  verified BOOLEAN NOT NULL DEFAULT false,
   content_hash TEXT,
   metadata JSONB DEFAULT '{}'::jsonb,
   embedding vector(768),
@@ -49,6 +53,50 @@ CREATE TABLE IF NOT EXISTS candidate_evidence (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Ensure additive columns exist on pre-existing candidate_evidence table
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'candidate_evidence' AND column_name = 'candidate_id') THEN
+    ALTER TABLE candidate_evidence ADD COLUMN candidate_id UUID REFERENCES auth.users(id) ON DELETE CASCADE;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'candidate_evidence' AND column_name = 'evidence_level') THEN
+    ALTER TABLE candidate_evidence ADD COLUMN evidence_level TEXT NOT NULL DEFAULT 'L4_SOURCE_CODE';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'candidate_evidence' AND column_name = 'verification_status') THEN
+    ALTER TABLE candidate_evidence ADD COLUMN verification_status TEXT NOT NULL DEFAULT 'unverified';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'candidate_evidence' AND column_name = 'source_uri') THEN
+    ALTER TABLE candidate_evidence ADD COLUMN source_uri TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'candidate_evidence' AND column_name = 'repository') THEN
+    ALTER TABLE candidate_evidence ADD COLUMN repository TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'candidate_evidence' AND column_name = 'file_path') THEN
+    ALTER TABLE candidate_evidence ADD COLUMN file_path TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'candidate_evidence' AND column_name = 'line_start') THEN
+    ALTER TABLE candidate_evidence ADD COLUMN line_start INT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'candidate_evidence' AND column_name = 'line_end') THEN
+    ALTER TABLE candidate_evidence ADD COLUMN line_end INT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'candidate_evidence' AND column_name = 'commit_sha') THEN
+    ALTER TABLE candidate_evidence ADD COLUMN commit_sha TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'candidate_evidence' AND column_name = 'pull_request_number') THEN
+    ALTER TABLE candidate_evidence ADD COLUMN pull_request_number INT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'candidate_evidence' AND column_name = 'content_hash') THEN
+    ALTER TABLE candidate_evidence ADD COLUMN content_hash TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'candidate_evidence' AND column_name = 'observed_at') THEN
+    ALTER TABLE candidate_evidence ADD COLUMN observed_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+  END IF;
+END $$;
+
+UPDATE candidate_evidence SET candidate_id = user_id WHERE candidate_id IS NULL AND user_id IS NOT NULL;
+UPDATE candidate_evidence SET user_id = candidate_id WHERE user_id IS NULL AND candidate_id IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_candidate_evidence_candidate ON candidate_evidence(candidate_id);
 CREATE INDEX IF NOT EXISTS idx_candidate_evidence_tech ON candidate_evidence USING GIN(technologies);
@@ -174,7 +222,7 @@ CREATE TABLE IF NOT EXISTS ai_execution_traces (
 CREATE INDEX IF NOT EXISTS idx_ai_traces_run ON ai_execution_traces(run_id);
 CREATE INDEX IF NOT EXISTS idx_ai_traces_candidate ON ai_execution_traces(candidate_id);
 
--- 10. Enable Row Level Security (RLS) on all new tables
+-- 10. Enable Row Level Security (RLS) on all tables
 ALTER TABLE evidence_snapshots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE candidate_evidence ENABLE ROW LEVEL SECURITY;
 ALTER TABLE evidence_relationships ENABLE ROW LEVEL SECURITY;
@@ -186,38 +234,47 @@ ALTER TABLE evidence_tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ai_execution_traces ENABLE ROW LEVEL SECURITY;
 
 -- 11. Strict Isolation RLS Policies
+DROP POLICY IF EXISTS "Users can only access own evidence snapshots" ON evidence_snapshots;
 CREATE POLICY "Users can only access own evidence snapshots"
   ON evidence_snapshots FOR ALL
   USING (auth.uid() = candidate_id);
 
+DROP POLICY IF EXISTS "Users can only access own evidence items" ON candidate_evidence;
 CREATE POLICY "Users can only access own evidence items"
   ON candidate_evidence FOR ALL
-  USING (auth.uid() = candidate_id);
+  USING (auth.uid() = candidate_id OR auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can only access own evidence relationships" ON evidence_relationships;
 CREATE POLICY "Users can only access own evidence relationships"
   ON evidence_relationships FOR ALL
   USING (auth.uid() = candidate_id);
 
+DROP POLICY IF EXISTS "Users can only access own evidence conflicts" ON evidence_conflicts;
 CREATE POLICY "Users can only access own evidence conflicts"
   ON evidence_conflicts FOR ALL
   USING (auth.uid() = candidate_id);
 
+DROP POLICY IF EXISTS "Users can only access own job requirements" ON job_requirements;
 CREATE POLICY "Users can only access own job requirements"
   ON job_requirements FOR ALL
   USING (auth.uid() = candidate_id);
 
+DROP POLICY IF EXISTS "Users can only access own requirement matches" ON requirement_evidence_matches;
 CREATE POLICY "Users can only access own requirement matches"
   ON requirement_evidence_matches FOR ALL
   USING (auth.uid() = candidate_id);
 
+DROP POLICY IF EXISTS "Users can only access own evidence plans" ON evidence_plans;
 CREATE POLICY "Users can only access own evidence plans"
   ON evidence_plans FOR ALL
   USING (auth.uid() = candidate_id);
 
+DROP POLICY IF EXISTS "Users can only access own evidence tasks" ON evidence_tasks;
 CREATE POLICY "Users can only access own evidence tasks"
   ON evidence_tasks FOR ALL
   USING (auth.uid() = candidate_id);
 
+DROP POLICY IF EXISTS "Users can only access own AI execution traces" ON ai_execution_traces;
 CREATE POLICY "Users can only access own AI execution traces"
   ON ai_execution_traces FOR ALL
   USING (auth.uid() = candidate_id);

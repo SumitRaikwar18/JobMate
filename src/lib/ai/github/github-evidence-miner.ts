@@ -1,5 +1,7 @@
 import type { EvidenceItem, EvidenceLevel } from "../evidence/evidence-types";
 import { EvidenceService } from "../evidence/evidence-service";
+import { ASTAnalyzer } from "../code-intelligence/ast-analyzer";
+import { ASTEvidenceExtractor } from "../code-intelligence/evidence-extractor";
 
 export interface GitHubRepoContext {
   owner: string;
@@ -8,6 +10,7 @@ export interface GitHubRepoContext {
   readmeContent?: string;
   fileTree?: string[];
   manifests?: Record<string, string>; // e.g. "package.json": content
+  sourceFiles?: Record<string, string>; // e.g. "src/index.ts": content
   ciWorkflows?: string[];
   recentCommits?: Array<{ sha: string; message: string; date: string; author: string }>;
   recentPRs?: Array<{ number: number; title: string; state: string; mergedAt?: string }>;
@@ -37,6 +40,7 @@ export class GitHubEvidenceMiner {
     const evidenceItems: EvidenceItem[] = [];
     const repoFullName = `${context.owner}/${context.repo}`;
     const now = new Date().toISOString();
+    const latestCommit = context.recentCommits?.[0];
 
     // 1. Ingest Manifest Dependencies (L3_MANIFEST_DEPENDENCY)
     if (context.manifests) {
@@ -64,7 +68,24 @@ export class GitHubEvidenceMiner {
       }
     }
 
-    // 2. Ingest CI & Test Workflows (L6_TEST_CI)
+    // 2. Ingest Source Code via Real AST Analysis (L4_SOURCE_CODE & L6_TEST_CI)
+    if (context.sourceFiles) {
+      for (const [filePath, content] of Object.entries(context.sourceFiles)) {
+        const parseResult = await ASTAnalyzer.analyzeFile(filePath, content);
+        if (parseResult.status === "success") {
+          const astEvidence = ASTEvidenceExtractor.extractEvidence(parseResult, {
+            candidateId,
+            repository: repoFullName,
+            commitSha: latestCommit?.sha,
+            author: latestCommit?.author,
+            observedAt: now,
+          });
+          evidenceItems.push(...astEvidence);
+        }
+      }
+    }
+
+    // 3. Ingest CI & Test Workflows (L6_TEST_CI)
     if (context.ciWorkflows && context.ciWorkflows.length > 0) {
       for (const wf of context.ciWorkflows) {
         evidenceItems.push({
@@ -87,10 +108,9 @@ export class GitHubEvidenceMiner {
       }
     }
 
-    // 3. Ingest Recent Commits (L5_COMMIT_PR)
+    // 4. Ingest Recent Commits (L5_COMMIT_PR)
     if (context.recentCommits && context.recentCommits.length > 0) {
       const commitCount = context.recentCommits.length;
-      const latestCommit = context.recentCommits[0];
       const oldestCommit = context.recentCommits[commitCount - 1];
 
       evidenceItems.push({
@@ -118,7 +138,7 @@ export class GitHubEvidenceMiner {
       });
     }
 
-    // 4. Ingest Readme Context (L2_README_CLAIM) - Untrusted data boundary
+    // 5. Ingest Readme Context (L2_README_CLAIM) - Untrusted data boundary
     if (context.readmeContent) {
       const sanitizedSummary = context.readmeContent
         .slice(0, 500)
