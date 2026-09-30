@@ -59,6 +59,7 @@ import {
 import {
   executeMultiAgentResumePipeline,
 } from "@/lib/ai/orchestrator";
+import { EvidenceService } from "@/lib/ai/evidence/evidence-service";
 import type {
   CandidateEvidenceBank,
   AgentExecutionStep,
@@ -641,6 +642,27 @@ function ResumeBuilderPage() {
     setPipelineSteps([]);
     setPipelineResult(null);
 
+    // Fetch persistent Supabase evidence if candidate is logged in
+    let dbEvidenceItems: any[] = [];
+    if (user?.id) {
+      try {
+        const persisted = await EvidenceService.getCandidateEvidence(user.id);
+        dbEvidenceItems = persisted.map((p) => ({
+          id: p.id,
+          category: (p.sourceType === "github" ? "project" : p.sourceType === "experience" ? "experience" : "project") as any,
+          title: p.title || "Engineering Evidence",
+          organization: p.repository || "GitHub",
+          verifiedClaims: [p.content],
+          metrics: (p.metrics || []).map((m: any) => typeof m === "string" ? m : `${m.metricName}: ${m.observedValue || m.metricValue || ""}`),
+          technologiesUsed: p.technologies || [],
+          verificationStatus: p.verificationStatus,
+          evidenceLevel: p.evidenceLevel,
+        }));
+      } catch (err) {
+        console.warn("[Builder] Could not fetch DB evidence:", err);
+      }
+    }
+
     const evidenceBank: CandidateEvidenceBank = {
       candidateId: user?.id || "local-user",
       fullName: resumeData.personal.name || "Candidate",
@@ -665,6 +687,7 @@ function ResumeBuilderPage() {
           metrics: [],
           technologiesUsed: proj.technologies.split(",").map((s) => s.trim()),
         })),
+        ...dbEvidenceItems,
       ],
     };
 
@@ -748,6 +771,24 @@ function ResumeBuilderPage() {
       ...prev,
       projects: [newProject, ...prev.projects],
     }));
+
+    if (user?.id) {
+      EvidenceService.saveEvidenceItem({
+        candidateId: user.id,
+        sourceType: "github",
+        evidenceLevel: "L4_SOURCE_CODE",
+        verificationStatus: "verified",
+        title: githubAnalysis.projectTitle,
+        content: `${githubAnalysis.architectureSummary} ${githubAnalysis.xyzBullets.join(" ")}`,
+        repository: githubAnalysis.repoUrl,
+        technologies: githubAnalysis.primaryTechnologies,
+        concepts: [],
+        metrics: [],
+        confidence: 0.90,
+        observedAt: new Date().toISOString(),
+      }).catch((err) => console.warn("[Builder] Could not persist mined GitHub project:", err));
+    }
+
     setIsGithubModalOpen(false);
     setGithubAnalysis(null);
     setGithubRepoUrl("");

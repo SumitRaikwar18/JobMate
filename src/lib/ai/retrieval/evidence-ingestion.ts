@@ -48,6 +48,7 @@ export async function ingestCandidateEvidence(
 
   // Upsert into Supabase candidate_evidence table
   const rowsToInsert = chunks.map((chunk, idx) => ({
+    candidate_id: input.userId,
     user_id: input.userId,
     source_type: chunk.sourceType,
     source_id: chunk.sourceId,
@@ -87,7 +88,7 @@ export async function fetchUserCandidateEvidence(userId: string): Promise<Eviden
     const { data, error } = await supabase
       .from("candidate_evidence")
       .select("*")
-      .eq("user_id", userId)
+      .or(`candidate_id.eq.${userId},user_id.eq.${userId}`)
       .order("created_at", { ascending: false });
 
     if (error || !data) {
@@ -96,7 +97,7 @@ export async function fetchUserCandidateEvidence(userId: string): Promise<Eviden
 
     return data.map((row: any) => ({
       id: row.id,
-      candidateId: row.user_id,
+      candidateId: row.candidate_id || row.user_id,
       sourceType: row.source_type,
       sourceId: row.source_id,
       sourceUrl: row.source_url,

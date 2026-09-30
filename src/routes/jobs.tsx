@@ -104,7 +104,7 @@ function JobsPage() {
         supabase
           .from("candidate_evidence")
           .select("technologies, content")
-          .eq("user_id", user.id),
+          .or(`candidate_id.eq.${user.id},user_id.eq.${user.id}`),
       ]);
 
       if (jobsRes.data) {
