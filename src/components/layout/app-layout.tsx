@@ -37,7 +37,8 @@ import { getAiQuotaStatus, subscribeCreditUpdates } from "@/lib/ai/rate-limiter"
 
 export interface AppLayoutProps {
   children: ReactNode;
-  activeNav: "dashboard" | "create" | "templates" | "jobs" | "applications" | "assistant" | "settings";
+  activeNav: "dashboard" | "create" | "templates" | "jobs" | "evidence" | "applications" | "assistant" | "settings";
+  showBetaBanner?: boolean;
 }
 
 export function AppLayout({ children, activeNav }: AppLayoutProps) {
@@ -152,6 +153,7 @@ export function AppLayout({ children, activeNav }: AppLayoutProps) {
   const NAV_ITEMS = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
     { id: "create", label: "Resume Builder", icon: FileText, href: "/builder" },
+    { id: "evidence", label: "Evidence Graph", icon: ShieldCheck, href: "/evidence" },
     { id: "templates", label: "ATS Templates", icon: Layers, href: "/templates" },
     { id: "jobs", label: "Job Matcher", icon: ClipboardList, href: "/jobs" },
     { id: "applications", label: "Applications", icon: Send, href: "/applications" },

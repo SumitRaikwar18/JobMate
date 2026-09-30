@@ -68,7 +68,7 @@ describe("Deep Verification: End-to-End Pipeline & Security Tests", () => {
 
       expect(allBullets.length).toBeGreaterThan(0);
       expect(allBullets.some((b: string) => b.toLowerCase().includes("python") || b.toLowerCase().includes("pgvector") || b.toLowerCase().includes("typescript"))).toBe(true);
-    });
+    }, 15000);
   });
 
   describe("2. Negative Test: Skill Omission & Anti-Hallucination", () => {

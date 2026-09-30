@@ -124,19 +124,22 @@ export class ResumeStateGraph {
       this.onStepCallback(step);
     }
 
-    // Persist node execution telemetry to Supabase if authenticated
+    // Persist node execution telemetry to Supabase
     try {
       const { data: userData } = await supabase.auth.getUser();
-      if (userData?.user?.id) {
-        await supabase.from("ai_run_nodes").insert({
-          run_id: undefined, // linked via FK when run exists
+      const candidateId = userData?.user?.id || this.state.candidateId;
+      if (candidateId) {
+        await supabase.from("ai_execution_traces").insert({
+          run_id: this.state.runId,
+          trace_id: `trace_${this.state.runId}_${agentName}`,
+          candidate_id: candidateId,
           node_name: agentName,
-          display_name: displayName,
-          status,
-          output_summary: outputSummary || null,
+          attempt: this.state.reflectionCount + 1,
+          started_at: step.startedAt,
+          finished_at: step.finishedAt || null,
+          status: status === "completed" ? "success" : status === "failed" ? "failed" : "running",
           created_at: step.startedAt,
-          completed_at: step.finishedAt || null,
-        });
+        } as any);
       }
     } catch {
       // non-blocking background telemetry
@@ -313,12 +316,14 @@ export class ResumeStateGraph {
     this.state.totalInputTokens += inTokens;
     this.state.totalOutputTokens += outTokens;
 
-    if (report.passed || report.overallGroundingScore >= 80) {
+    const isFullyGrounded = report.passed && ((report as any).blockedClaimsCount === 0 || (report as any).blockedClaimsCount === undefined) && report.overallGroundingScore >= 75;
+
+    if (isFullyGrounded) {
       await this.updateStep(
         "Critic_Guardrail",
         "Anti-Hallucination Guardrail Agent",
         "completed",
-        `Verification PASSED. Grounding Score: ${report.overallGroundingScore}%. Verified ${report.verifiedClaimsCount} claims.`
+        `Verification PASSED. Grounding Score: ${report.overallGroundingScore}%. Verified ${report.verifiedClaimsCount} claims with zero blocked claims.`
       );
     } else {
       this.state.criticFeedback = report.critique;
@@ -326,7 +331,7 @@ export class ResumeStateGraph {
         "Critic_Guardrail",
         "Anti-Hallucination Guardrail Agent",
         "reflection_loop",
-        `Unverified claim detected! Triggering Reflection Cycle #${this.state.reflectionCount + 1}...`
+        `Unverified or blocked metric claim detected! Triggering Reflection Cycle #${this.state.reflectionCount + 1}...`
       );
     }
   }
@@ -337,7 +342,7 @@ export class ResumeStateGraph {
   private async nodeAtsAuditor(): Promise<void> {
     if (!this.state.currentDraft || !this.state.jobAnalysis) return;
     const promptMeta = PROMPT_REGISTRY["ats_auditor:v1.1"];
-    await this.updateStep("ATS_Auditor", "ATS Simulator Agent", "running", `Simulating ATS heuristic evaluation (${promptMeta?.version || "v1.1"})...`);
+    await this.updateStep("ATS_Auditor", "ATS Simulator Agent", "running", `Simulating ATS structure evaluation (${promptMeta?.version || "v1.1"})...`);
     
     const inTokens = estimateTokenCount(JSON.stringify(this.state.currentDraft)) + estimateTokenCount(JSON.stringify(this.state.jobAnalysis));
     const audit = await runAtsAuditorAgent(this.state.currentDraft, this.state.jobAnalysis);
@@ -351,7 +356,7 @@ export class ResumeStateGraph {
       "ATS_Auditor",
       "ATS Simulator Agent",
       "completed",
-      `ATS Score: ${audit.overallScore}%. Keyword Density: ${audit.keywordDensityScore}%. Single-Column AST: Verified.`
+      `ATS Score: ${audit.overallScore}%. Keyword Density: ${audit.keywordDensityScore}%. Single-Column Structure: Verified.`
     );
   }
 
@@ -376,12 +381,11 @@ export class ResumeStateGraph {
       await this.nodeXyzSynthesizer();
       await this.nodeCriticGuardrail();
 
-      // Conditional Edge Decision
-      if (
-        (this.state.guardrailReport as any)?.passed ||
-        ((this.state.guardrailReport as any)?.overallGroundingScore ?? 0) >= 80 ||
-        this.state.reflectionCount >= this.state.maxReflections
-      ) {
+      // Conditional Edge Decision: Hard Gate
+      const guardReport = this.state.guardrailReport as any;
+      const passedHardGate = guardReport?.passed && (guardReport?.blockedClaimsCount === 0 || guardReport?.blockedClaimsCount === undefined) && (guardReport?.overallGroundingScore ?? 0) >= 75;
+
+      if (passedHardGate || this.state.reflectionCount >= this.state.maxReflections) {
         break;
       }
 

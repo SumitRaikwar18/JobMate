@@ -14,6 +14,7 @@ import { Route as ApplicationsRouteImport } from './routes/applications'
 import { Route as AssistantRouteImport } from './routes/assistant'
 import { Route as BuilderRouteImport } from './routes/builder'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as EvidenceRouteImport } from './routes/evidence'
 import { Route as JobsRouteImport } from './routes/jobs'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as SettingsRouteImport } from './routes/settings'
@@ -44,6 +45,11 @@ const DashboardRoute = DashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EvidenceRoute = EvidenceRouteImport.update({
+  id: '/evidence',
+  path: '/evidence',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const JobsRoute = JobsRouteImport.update({
   id: '/jobs',
   path: '/jobs',
@@ -71,6 +77,7 @@ export interface FileRoutesByFullPath {
   '/assistant': typeof AssistantRoute
   '/builder': typeof BuilderRoute
   '/dashboard': typeof DashboardRoute
+  '/evidence': typeof EvidenceRoute
   '/jobs': typeof JobsRoute
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
@@ -82,6 +89,7 @@ export interface FileRoutesByTo {
   '/assistant': typeof AssistantRoute
   '/builder': typeof BuilderRoute
   '/dashboard': typeof DashboardRoute
+  '/evidence': typeof EvidenceRoute
   '/jobs': typeof JobsRoute
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
@@ -94,6 +102,7 @@ export interface FileRoutesById {
   '/assistant': typeof AssistantRoute
   '/builder': typeof BuilderRoute
   '/dashboard': typeof DashboardRoute
+  '/evidence': typeof EvidenceRoute
   '/jobs': typeof JobsRoute
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
@@ -107,6 +116,7 @@ export interface FileRouteTypes {
     | '/assistant'
     | '/builder'
     | '/dashboard'
+    | '/evidence'
     | '/jobs'
     | '/login'
     | '/settings'
@@ -118,6 +128,7 @@ export interface FileRouteTypes {
     | '/assistant'
     | '/builder'
     | '/dashboard'
+    | '/evidence'
     | '/jobs'
     | '/login'
     | '/settings'
@@ -129,6 +140,7 @@ export interface FileRouteTypes {
     | '/assistant'
     | '/builder'
     | '/dashboard'
+    | '/evidence'
     | '/jobs'
     | '/login'
     | '/settings'
@@ -141,6 +153,7 @@ export interface RootRouteChildren {
   AssistantRoute: typeof AssistantRoute
   BuilderRoute: typeof BuilderRoute
   DashboardRoute: typeof DashboardRoute
+  EvidenceRoute: typeof EvidenceRoute
   JobsRoute: typeof JobsRoute
   LoginRoute: typeof LoginRoute
   SettingsRoute: typeof SettingsRoute
@@ -184,6 +197,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/evidence': {
+      id: '/evidence'
+      path: '/evidence'
+      fullPath: '/evidence'
+      preLoaderRoute: typeof EvidenceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/jobs': {
       id: '/jobs'
       path: '/jobs'
@@ -221,6 +241,7 @@ const rootRouteChildren: RootRouteChildren = {
   AssistantRoute: AssistantRoute,
   BuilderRoute: BuilderRoute,
   DashboardRoute: DashboardRoute,
+  EvidenceRoute: EvidenceRoute,
   JobsRoute: JobsRoute,
   LoginRoute: LoginRoute,
   SettingsRoute: SettingsRoute,

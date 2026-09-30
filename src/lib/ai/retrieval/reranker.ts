@@ -1,6 +1,7 @@
 import type { HybridRetrievedItem } from "./hybrid-retriever";
 import { generateStructuredOutput } from "../structured-output";
 import { z } from "zod";
+import { EVIDENCE_LEVEL_WEIGHTS, type EvidenceLevel } from "../evidence/evidence-types";
 
 export interface RerankedItem extends HybridRetrievedItem {
   rerankScore: number;
@@ -8,6 +9,7 @@ export interface RerankedItem extends HybridRetrievedItem {
   newRank: number;
   rankDelta: number;
   rerankReasoning: string;
+  tierBoostApplied?: number;
 }
 
 export interface RerankingResult {
@@ -27,8 +29,8 @@ const RerankResponseSchema = z.object({
 });
 
 /**
- * LLM-Based Structured Evidence Reranker
- * Evaluates and re-scores candidate evidence items specifically for target job requirements using structured JSON evaluation.
+ * Multi-Factor Evidence Reranker
+ * Combines semantic LLM relevance, L0-L7 evidence tier reliability, and freshness.
  */
 export async function rerankRetrievedEvidence(
   jobRequirement: string,
@@ -57,6 +59,7 @@ export async function rerankRetrievedEvidence(
     const evidenceSnippets = retrievedItems.map((item) => ({
       id: item.evidence.id,
       title: item.evidence.title,
+      level: (item.evidence as any).evidenceLevel || "L1_RESUME_CLAIM",
       technologies: item.evidence.technologies,
       content: item.evidence.content.slice(0, 300),
       metrics: item.evidence.metrics,
@@ -93,15 +96,23 @@ Respond with JSON adhering to the required schema with evidenceId, relevanceScor
       item: HybridRetrievedItem;
       rerankScore: number;
       reasoning: string;
+      tierBoost: number;
     }> = retrievedItems.map((item) => {
       const llmEval = scoresMap.get(item.evidence.id);
-      const rerankScore = llmEval !== undefined
-        ? Number((0.7 * llmEval.score + 0.3 * item.combinedScore).toFixed(4))
-        : item.combinedScore;
+      const level = ((item.evidence as any).evidenceLevel as EvidenceLevel) || "L1_RESUME_CLAIM";
+      const tierWeight = EVIDENCE_LEVEL_WEIGHTS[level] || 0.5;
+      const tierBoost = Number((tierWeight * 0.20).toFixed(3));
+
+      // Weighted combination: 55% LLM relevance + 25% dense/sparse search score + 20% tier reliability
+      const relevance = llmEval !== undefined ? llmEval.score : item.combinedScore;
+      const rerankScore = Number(
+        (0.55 * relevance + 0.25 * item.combinedScore + tierBoost).toFixed(4)
+      );
 
       return {
         item,
         rerankScore,
+        tierBoost,
         reasoning: llmEval?.reasoning || item.retrievalExplanation,
       };
     });
@@ -113,8 +124,9 @@ Respond with JSON adhering to the required schema with evidenceId, relevanceScor
       rerankScore: entry.rerankScore,
       originalRank: entry.item.rank,
       newRank: idx + 1,
-      rankDelta: entry.item.rank - (idx + 1), // positive means moved up
+      rankDelta: entry.item.rank - (idx + 1),
       rerankReasoning: entry.reasoning,
+      tierBoostApplied: entry.tierBoost,
     }));
 
     return {
@@ -122,21 +134,28 @@ Respond with JSON adhering to the required schema with evidenceId, relevanceScor
       items: finalItems,
       latencyMs: Math.round(performance.now() - startTime),
     };
-  } catch (err) {
-    console.warn("[Reranker] LLM reranking unavailable, falling back to hybrid retrieval scores:", err);
+  } catch (error) {
+    console.warn("[Reranker] Model reranking unavailable, using tier-weighted fallback:", error);
 
-    const fallbackItems: RerankedItem[] = retrievedItems.map((item, idx) => ({
-      ...item,
-      rerankScore: item.combinedScore,
-      originalRank: item.rank,
-      newRank: idx + 1,
-      rankDelta: 0,
-      rerankReasoning: item.retrievalExplanation,
-    }));
+    const fallbackList = retrievedItems.map((item) => {
+      const level = ((item.evidence as any).evidenceLevel as EvidenceLevel) || "L1_RESUME_CLAIM";
+      const tierWeight = EVIDENCE_LEVEL_WEIGHTS[level] || 0.5;
+      const rerankScore = Number((0.7 * item.combinedScore + 0.3 * tierWeight).toFixed(4));
+      return { item, rerankScore };
+    });
+
+    fallbackList.sort((a, b) => b.rerankScore - a.rerankScore);
 
     return {
       jobRequirement,
-      items: fallbackItems,
+      items: fallbackList.map((entry, idx) => ({
+        ...entry.item,
+        rerankScore: entry.rerankScore,
+        originalRank: entry.item.rank,
+        newRank: idx + 1,
+        rankDelta: entry.item.rank - (idx + 1),
+        rerankReasoning: entry.item.retrievalExplanation,
+      })),
       latencyMs: Math.round(performance.now() - startTime),
     };
   }
