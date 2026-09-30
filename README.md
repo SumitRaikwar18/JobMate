@@ -1,7 +1,7 @@
 # JobMate — Evidence-Grounded AI Career Intelligence Engine
 
 <div align="center">
-  <img src="public/favicon.svg" alt="JobMate Logo" width="64" height="64" />
+  <img src="public/jobmate-banner.png" alt="JobMate AI Career Intelligence Engine Banner" width="100%" style="max-width: 900px; border-radius: 12px; margin-bottom: 12px;" />
   <p><strong>Turn your real engineering work into evidence-backed, ATS-optimized job applications.</strong></p>
 </div>
 

@@ -3,13 +3,13 @@
   "short_name": "JobMate",
   "icons": [
     {
-      "src": "/favicon.svg",
+      "src": "/jobmate-logo.png",
       "sizes": "any",
-      "type": "image/svg+xml"
+      "type": "image/png"
     }
   ],
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#2563eb"
+  "theme_color": "#4f46e5"
 }
